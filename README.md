@@ -3,8 +3,7 @@
 <div align="center">
 
 [![Go](https://img.shields.io/badge/Go-1.23.6+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org/)
-[![Fyne](https://img.shields.io/badge/Fyne-v2.6.1-007ACC?style=for-the-badge&logo=go&logoColor=white)](https://fyne.io/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
+[![Gio](https://img.shields.io/badge/Fyne-v2.6.1-007ACC?style=for-the-badge&logo=go&logoColor=white)](https://gioui.org/)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen?style=for-the-badge)](Makefile)
 
 **A modern web browser built from scratch in Go using Fyne**
@@ -23,7 +22,7 @@ _Learning browser internals by implementing core web technologies_
 
 ## 📋 Overview
 
-GoBrowser is an educational web browser implementation built from the ground up using **Go** and **Fyne** GUI framework. This project follows the comprehensive [Browser Engineering](https://browser.engineering/) tutorial, providing hands-on experience with:
+GoBrowser is an educational web browser implementation built from the ground up using **Go** and **Gio** GUI framework. This project follows the comprehensive [Browser Engineering]:
 
 - 🌐 **HTTP/HTTPS protocol handling**
 - 📝 **HTML parsing and DOM tree construction**
@@ -38,7 +37,7 @@ GoBrowser is an educational web browser implementation built from the ground up 
 
 ### ✅ Currently Implemented
 
-- [x] Basic Fyne GUI application structure
+- [x] Basic Gio GUI application structure
 - [x] Main window and UI components
 - [x] Project architecture and build system
 
@@ -148,7 +147,7 @@ make fix-lint
 The project uses several development tools to ensure code quality:
 
 - **golangci-lint** - Comprehensive Go linter
-- **Fyne tools** - GUI development utilities
+- **Gio tools** - GUI development utilities
 - **Go testing** - Built-in testing framework
 
 ### Architecture Principles
@@ -165,7 +164,7 @@ Following the browser-engineering methodology, this project emphasizes:
 ### Learning Resources
 
 - 📚 **[Browser Engineering Book](https://browser.engineering/)** - Primary learning resource
-- 🎯 **[Fyne Documentation](https://docs.fyne.io/)** - GUI framework documentation
+- 🎯 **[Gio Documentation](https://gioui.org/doc/learn/get-started)** - GUI framework documentation
 - 🔧 **[Go Documentation](https://golang.org/doc/)** - Go language reference
 
 ### Browser Components
@@ -177,10 +176,6 @@ Following the browser-engineering methodology, this project emphasizes:
 | JavaScript  | V8-like execution environment     | 🚧 Planning    |
 | Networking  | HTTP/HTTPS request handling       | 🚧 Planning    |
 | UI Layer    | Fyne-based user interface         | ✅ In Progress |
-
-## 🎨 Screenshots
-
-_Screenshots will be added as the browser develops visual components_
 
 ## 🤝 Contributing
 
@@ -198,25 +193,3 @@ _Screenshots will be added as the browser develops visual components_
 - Write comprehensive tests for new features
 - Update documentation for any API changes
 - Use meaningful commit messages
-
-## 🙏 Acknowledgments
-
-- **[Browser Engineering](https://browser.engineering/)** - Comprehensive guide to browser internals
-- **[Fyne](https://fyne.io/)** - Cross-platform GUI framework for Go
-- **Go Community** - For excellent tooling and ecosystem
-
-## 📞 Contact
-
-**Duc Nguyen** - [@ducnd58233](https://github.com/ducnd58233)
-
-Project Link: [https://github.com/ducnd58233/gobrowser](https://github.com/ducnd58233/gobrowser)
-
----
-
-<div align="center">
-
-**⭐ Star this repository if you find it helpful!**
-
-_Built with ❤️ using Go and Fyne_
-
-</div>

@@ -14,7 +14,7 @@ GOIMPORTS := $(GOPATH)/bin/goimports
 # ------------------------------------------------------------
 .PHONY: install-tools
 install-tools:
-	$(GOINSTALL) fyne.io/tools/cmd/fyne@latest
+	$(GOINSTALL) gioui.org/cmd/gogio@latest
 
 .PHONY: linter
 linter:

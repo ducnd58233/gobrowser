@@ -5,5 +5,6 @@ import (
 )
 
 func main() {
-	ui.NewMainWindow().Run()
+	mainWindow := ui.NewMainWindow()
+	mainWindow.Run()
 }
