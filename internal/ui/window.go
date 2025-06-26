@@ -5,8 +5,13 @@ import (
 	"os"
 
 	"gioui.org/app"
+	"gioui.org/font/gofont"
+	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/text"
 	"gioui.org/unit"
+	"gioui.org/widget/material"
+	"github.com/ducnd58233/gobrowser/internal/browser"
 )
 
 type MainWindow interface {
@@ -14,7 +19,9 @@ type MainWindow interface {
 }
 
 type mainWindow struct {
-	window *app.Window
+	window  *app.Window
+	tabView TabView
+	theme   *material.Theme
 }
 
 func NewMainWindow() MainWindow {
@@ -31,8 +38,16 @@ func NewMainWindow() MainWindow {
 		),
 	)
 
+	engine := browser.NewEngine()
+	engine.AddTab()
+
+	theme := material.NewTheme()
+	theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
+
 	return &mainWindow{
-		window: window,
+		window:  window,
+		tabView: NewTabView(engine),
+		theme:   theme,
 	}
 }
 
@@ -49,9 +64,18 @@ func (mw *mainWindow) Run() {
 				os.Exit(0)
 			case app.FrameEvent:
 				gtx := app.NewContext(&ops, e)
+				mw.render(gtx)
 				e.Frame(gtx.Ops)
 			}
 		}
 	}()
 	app.Main()
+}
+
+func (mw *mainWindow) render(gtx layout.Context) layout.Dimensions {
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return mw.tabView.Render(gtx, mw.theme)
+		}),
+	)
 }

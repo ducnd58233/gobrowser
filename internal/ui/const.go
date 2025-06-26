@@ -6,5 +6,8 @@ const (
 	WindowMinWidth         = 800
 	WindowMinHeight        = 600
 
+	MaxTabTitleLength      = 20
+	TruncationSuffixLength = 3
+
 	AppName = "gobrowser"
 )
