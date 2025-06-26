@@ -19,9 +19,11 @@ type MainWindow interface {
 }
 
 type mainWindow struct {
-	window  *app.Window
+	window *app.Window
+	theme  *material.Theme
+
 	tabView TabView
-	theme   *material.Theme
+	toolbar Toolbar
 }
 
 func NewMainWindow() MainWindow {
@@ -46,8 +48,9 @@ func NewMainWindow() MainWindow {
 
 	return &mainWindow{
 		window:  window,
-		tabView: NewTabView(engine),
 		theme:   theme,
+		tabView: NewTabView(engine),
+		toolbar: NewToolbar(engine),
 	}
 }
 
@@ -76,6 +79,9 @@ func (mw *mainWindow) render(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return mw.tabView.Render(gtx, mw.theme)
+		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return mw.toolbar.Render(gtx, mw.theme, mw.tabView.GetCurrentTabIndex())
 		}),
 	)
 }

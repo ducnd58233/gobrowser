@@ -1,6 +1,9 @@
 package browser
 
-import "strings"
+import (
+	"log"
+	"strings"
+)
 
 type page struct {
 	url  string
@@ -14,6 +17,8 @@ type Tab interface {
 	SetTitle(title string)
 	GetURL() string
 	SetURL(url string)
+	GetContent() string
+	SetContent(content string)
 	Navigate(url string)
 	CanGoBack() bool
 	GoBack()
@@ -56,6 +61,15 @@ func (t *tab) GetURL() string {
 
 func (t *tab) SetURL(url string) {
 	t.history.url = url
+}
+
+func (t *tab) GetContent() string {
+	return t.content
+}
+
+func (t *tab) SetContent(content string) {
+	t.content = content
+	log.Println(content)
 }
 
 func (t *tab) Navigate(url string) {
