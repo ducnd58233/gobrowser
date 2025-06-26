@@ -158,7 +158,7 @@ func (t *toolbar) handleNavigate(currTabIdx int) {
 	tab.Navigate(url)
 
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), browser.DefaultTimeoutSec)
+		ctx, cancel := context.WithTimeout(context.Background(), browser.DefaultTimeout)
 		defer cancel()
 
 		t.SetProgress(0.3)

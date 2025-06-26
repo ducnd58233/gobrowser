@@ -6,8 +6,8 @@ const (
 	DefaultUserAgent         = "GoBrowser/1.0"
 	IDByteLength             = 8
 	MaxConcurrentConnections = 10
-	DefaultTimeoutSec        = 30 * time.Second
-	KeepAliveTimeoutSec      = 30 * time.Second
+	DefaultTimeout        = 30 * time.Second
+	KeepAliveTimeout      = 30 * time.Second
 )
 
 const (

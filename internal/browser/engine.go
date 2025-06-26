@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"sync"
 )
@@ -29,11 +30,11 @@ type engine struct {
 func NewEngine() Engine {
 	return &engine{
 		client: &http.Client{
-			Timeout: DefaultTimeoutSec,
+			Timeout: DefaultTimeout,
 			Transport: &http.Transport{
 				MaxIdleConns:        MaxConcurrentConnections,
 				MaxIdleConnsPerHost: 5,
-				IdleConnTimeout:     DefaultTimeoutSec,
+				IdleConnTimeout:     DefaultTimeout,
 				DisableCompression:  false,
 			},
 		},
@@ -85,7 +86,7 @@ func (e *engine) RefreshTab(idx int) {
 	if tab == nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeoutSec)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 	_ = e.FetchContent(ctx, idx, tab.GetURL())
 }
@@ -108,6 +109,9 @@ func (e *engine) FetchContent(ctx context.Context, tabIdx int, rawURL string) er
 
 	tab.SetURL(normalizedURL)
 	tab.SetContent(content)
+	htmlParser := NewHTMLParser(content)
+	htmlParser.Parse()
+	log.Printf("HTMLTree: %s", htmlParser.PrintTree())
 
 	return nil
 }
