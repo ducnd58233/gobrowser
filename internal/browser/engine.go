@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sync"
 )
@@ -24,7 +23,8 @@ type engine struct {
 	tabs   []Tab
 	mutex  sync.RWMutex
 
-	urlNormalizer URLNormalizer
+	urlNormalizer   URLNormalizer
+	documentBuilder DocumentBuilder
 }
 
 func NewEngine() Engine {
@@ -38,8 +38,9 @@ func NewEngine() Engine {
 				DisableCompression:  false,
 			},
 		},
-		tabs:          make([]Tab, 0),
-		urlNormalizer: NewURLNormalizer(),
+		tabs:            make([]Tab, 0),
+		urlNormalizer:   NewURLNormalizer(),
+		documentBuilder: NewDocumentBuilder(),
 	}
 }
 
@@ -108,10 +109,13 @@ func (e *engine) FetchContent(ctx context.Context, tabIdx int, rawURL string) er
 	}
 
 	tab.SetURL(normalizedURL)
-	tab.SetContent(content)
-	htmlParser := NewHTMLParser(content)
-	htmlParser.Parse()
-	log.Printf("HTMLTree: %s", htmlParser.PrintTree())
+
+	doc, err := e.documentBuilder.Build(content)
+	if err != nil {
+		return err
+	}
+
+	tab.SetContent(doc)
 
 	return nil
 }

@@ -21,6 +21,7 @@ type MainWindow interface {
 type mainWindow struct {
 	window *app.Window
 	theme  *material.Theme
+	engine browser.Engine
 
 	tabView TabView
 	toolbar Toolbar
@@ -49,6 +50,7 @@ func NewMainWindow() MainWindow {
 	return &mainWindow{
 		window:  window,
 		theme:   theme,
+		engine:  engine,
 		tabView: NewTabView(engine),
 		toolbar: NewToolbar(engine),
 	}
@@ -83,5 +85,24 @@ func (mw *mainWindow) render(gtx layout.Context) layout.Dimensions {
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return mw.toolbar.Render(gtx, mw.theme, mw.tabView.GetCurrentTabIndex())
 		}),
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			return mw.renderContent()
+		}),
 	)
+}
+
+func (mw *mainWindow) renderContent() layout.Dimensions {
+	currentTabIdx := mw.tabView.GetCurrentTabIndex()
+	tab := mw.engine.GetTab(currentTabIdx)
+
+	if tab == nil {
+		return layout.Dimensions{}
+	}
+
+	document := tab.GetDocument()
+	if document == nil {
+		return layout.Dimensions{}
+	}
+
+	return layout.Dimensions{}
 }

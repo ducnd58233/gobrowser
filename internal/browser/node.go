@@ -171,7 +171,7 @@ func (t *textNode) AddChild(child Node) {
 	// No action
 }
 func (t *textNode) String() string {
-	return fmt.Sprintf("TextNode(content=%s)\n", t.content)
+	return fmt.Sprintf("TextNode(content=\"%s\")\n", t.content)
 }
 
 func (t *textNode) FindElementsByTag(tag string) []Node         { return nil }
@@ -205,7 +205,7 @@ func (c *commentNode) AddChild(child Node) {
 	// No action
 }
 func (c *commentNode) String() string {
-	return fmt.Sprintf("CommentNode(content=%s)\n", c.content)
+	return fmt.Sprintf("CommentNode(content=\"%s\")\n", c.content)
 }
 
 func (c *commentNode) FindElementsByTag(tag string) []Node         { return nil }
