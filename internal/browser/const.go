@@ -33,6 +33,14 @@ const (
 	DefaultSpacing = 8
 	CompactSpacing = 4
 	LargeSpacing   = 16
+
+	// Rendering Constants
+	RenderInsetTop    = 8
+	RenderInsetBottom = 8
+	RenderInsetLeft   = 16
+	RenderInsetRight  = 16
+	TextElementBottom = 4
+
 	DefaultPadding = 8
 	CompactPadding = 4
 	LargePadding   = 16
@@ -47,48 +55,56 @@ const (
 
 // CSS Properties
 const (
-	PropColor           = "color"
-	PropBackgroundColor = "background-color"
-	PropFontFamily      = "font-family"
-	PropFontSize        = "font-size"
-	PropFontWeight      = "font-weight"
-	PropFontStyle       = "font-style"
-	PropTextAlign       = "text-align"
-	PropDisplay         = "display"
-	PropMargin          = "margin"
-	PropMarginTop       = "margin-top"
-	PropMarginRight     = "margin-right"
-	PropMarginBottom    = "margin-bottom"
-	PropMarginLeft      = "margin-left"
-	PropPadding         = "padding"
-	PropPaddingTop      = "padding-top"
-	PropPaddingRight    = "padding-right"
-	PropPaddingBottom   = "padding-bottom"
-	PropPaddingLeft     = "padding-left"
-	PropBorder          = "border"
-	PropBorderTop       = "border-top"
-	PropBorderRight     = "border-right"
-	PropBorderBottom    = "border-bottom"
-	PropBorderLeft      = "border-left"
-	PropWidth           = "width"
-	PropHeight          = "height"
-	PropPosition        = "position"
-	PropTop             = "top"
-	PropRight           = "right"
-	PropBottom          = "bottom"
-	PropLeft            = "left"
-	PropZIndex          = "z-index"
-	PropOpacity         = "opacity"
-	PropVisibility      = "visibility"
-	PropOverflow        = "overflow"
-	PropTextDecoration  = "text-decoration"
-	PropTextTransform   = "text-transform"
-	PropLineHeight      = "line-height"
-	PropLetterSpacing   = "letter-spacing"
-	PropWordSpacing     = "word-spacing"
-	PropWhiteSpace      = "white-space"
-	PropCursor          = "cursor"
-	PropListStyle       = "list-style"
+	PropColor             = "color"
+	PropBackgroundColor   = "background-color"
+	PropFontFamily        = "font-family"
+	PropFontSize          = "font-size"
+	PropFontWeight        = "font-weight"
+	PropFontStyle         = "font-style"
+	PropTextAlign         = "text-align"
+	PropDisplay           = "display"
+	PropMargin            = "margin"
+	PropMarginTop         = "margin-top"
+	PropMarginRight       = "margin-right"
+	PropMarginBottom      = "margin-bottom"
+	PropMarginLeft        = "margin-left"
+	PropPadding           = "padding"
+	PropPaddingTop        = "padding-top"
+	PropPaddingRight      = "padding-right"
+	PropPaddingBottom     = "padding-bottom"
+	PropPaddingLeft       = "padding-left"
+	PropBorder            = "border"
+	PropBorderTop         = "border-top"
+	PropBorderRight       = "border-right"
+	PropBorderBottom      = "border-bottom"
+	PropBorderLeft        = "border-left"
+	PropWidth             = "width"
+	PropHeight            = "height"
+	PropMinWidth          = "min-width"
+	PropMinHeight         = "min-height"
+	PropMaxWidth          = "max-width"
+	PropMaxHeight         = "max-height"
+	PropPosition          = "position"
+	PropTop               = "top"
+	PropRight             = "right"
+	PropBottom            = "bottom"
+	PropLeft              = "left"
+	PropZIndex            = "z-index"
+	PropOpacity           = "opacity"
+	PropVisibility        = "visibility"
+	PropOverflow          = "overflow"
+	PropOverflowX         = "overflow-x"
+	PropOverflowY         = "overflow-y"
+	PropTextDecoration    = "text-decoration"
+	PropTextTransform     = "text-transform"
+	PropLineHeight        = "line-height"
+	PropLetterSpacing     = "letter-spacing"
+	PropWordSpacing       = "word-spacing"
+	PropWhiteSpace        = "white-space"
+	PropCursor            = "cursor"
+	PropListStyle         = "list-style"
+	PropListStyleType     = "list-style-type"
+	PropListStylePosition = "list-style-position"
 )
 
 // CSS Values
@@ -132,4 +148,16 @@ const (
 	HexBase             = 16
 	RGBShortMultiplier  = 17
 	DefaultAlpha        = 255
+
+	// Error color for rendering
+	ErrorColorR = 220
+	ErrorColorG = 53
+	ErrorColorB = 69
+	ErrorColorA = 255
+
+	// Link color for rendering
+	LinkColorR = 0
+	LinkColorG = 0
+	LinkColorB = 238
+	LinkColorA = 255
 )

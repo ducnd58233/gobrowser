@@ -17,7 +17,7 @@ type Tab interface {
 	GetURL() string
 	SetURL(url string)
 	GetDocument() Document
-	SetContent(document Document)
+	SetDocument(doc Document)
 	Navigate(url string)
 	CanGoBack() bool
 	GoBack()
@@ -47,7 +47,11 @@ func (t *tab) GetID() string {
 }
 
 func (t *tab) GetTitle() string {
-	return t.title
+	if t.title != "" {
+		return t.title
+	}
+
+	return "New Tab"
 }
 
 func (t *tab) SetTitle(title string) {
@@ -55,10 +59,17 @@ func (t *tab) SetTitle(title string) {
 }
 
 func (t *tab) GetURL() string {
+	if t.history == nil {
+		return ""
+	}
 	return t.history.url
 }
 
 func (t *tab) SetURL(url string) {
+	if t.history == nil {
+		t.history = &page{url: url}
+		return
+	}
 	t.history.url = url
 }
 
@@ -66,8 +77,11 @@ func (t *tab) GetDocument() Document {
 	return t.document
 }
 
-func (t *tab) SetContent(document Document) {
-	t.document = document
+func (t *tab) SetDocument(doc Document) {
+	t.document = doc
+	if doc != nil && doc.GetTitle() != "" {
+		t.title = doc.GetTitle()
+	}
 }
 
 func (t *tab) Navigate(url string) {

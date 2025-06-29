@@ -1,6 +1,8 @@
 package browser
 
-import "log"
+import (
+	"log"
+)
 
 type Document interface {
 	GetRoot() Node
@@ -41,19 +43,26 @@ type document struct {
 
 type DocumentBuilder interface {
 	Build(content string) (Document, error)
+	SetDebugMode(enabled bool)
 }
 
 type documentBuilder struct {
 	htmlParser    HTMLParser
 	cssParser     CSSParser
 	cssApplicator CSSApplicator
+	debugMode     bool
 }
 
 // NewDocumentBuilder creates a new document builder instance
 func NewDocumentBuilder() DocumentBuilder {
 	return &documentBuilder{
 		cssApplicator: NewCSSApplicator(),
+		debugMode:     false,
 	}
+}
+
+func (db *documentBuilder) SetDebugMode(enabled bool) {
+	db.debugMode = enabled
 }
 
 func (db *documentBuilder) Build(content string) (Document, error) {
@@ -103,24 +112,28 @@ func (db *documentBuilder) parseHTML(content string, doc *document) error {
 		doc.language = lang
 	}
 
-	log.Println(db.htmlParser.PrintTree())
+	if db.debugMode {
+		log.Println("HTML Parser Output:")
+		log.Println(db.htmlParser.PrintTree())
+	}
 
 	return nil
 }
 
 // parseCSS extracts and parses CSS from style tags and inline styles
 func (db *documentBuilder) parseCSS(doc *document) error {
-	// Get CSS content from style tags
 	styleContent := db.htmlParser.GetStyleTags()
 
-	// Add default browser styles
 	defaultCSS := db.getDefaultCSS()
 	fullCSS := defaultCSS + "\n" + styleContent
 
 	db.cssParser = NewCSSParser(fullCSS)
 	css := db.cssParser.Parse()
 
-	log.Println(css.PrintTree())
+	if db.debugMode {
+		log.Println("CSS Parser Output:")
+		log.Println(css.PrintTree())
+	}
 
 	doc.stylesheet = css
 	return nil

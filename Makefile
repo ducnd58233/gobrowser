@@ -27,12 +27,12 @@ linter:
 .PHONY: run-app
 run-app:
 	@echo "Running $(PROJECT) service..."
-	$(GOCMD) run ./cmd/main.go
+	$(GOCMD) run ./cmd/main.go --debug
 
 .PHONY: build-app
 build-app:
 	@echo "Building $(PROJECT) service..."
-	$(GOBUILD) -o ./build/$(PROJECT) ./cmd/main.go
+	$(GOBUILD) -ldflags "-s -w" -o ./build/$(PROJECT) ./cmd/main.go
 
 .PHONY: run-build
 run-build: build-app

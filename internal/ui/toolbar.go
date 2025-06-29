@@ -21,18 +21,24 @@ type Toolbar interface {
 }
 
 type toolbar struct {
-	engine    browser.Engine
-	urlEditor *widget.Editor
-	progress  float32
-	goButton  *widget.Clickable
+	engine        browser.Engine
+	urlEditor     *widget.Editor
+	progress      float32
+	goButton      *widget.Clickable
+	backButton    *widget.Clickable
+	forwardButton *widget.Clickable
+	refreshButton *widget.Clickable
 }
 
 func NewToolbar(engine browser.Engine) Toolbar {
 	return &toolbar{
-		engine:    engine,
-		urlEditor: &widget.Editor{SingleLine: true, Submit: true},
-		progress:  0.0,
-		goButton:  &widget.Clickable{},
+		engine:        engine,
+		urlEditor:     &widget.Editor{SingleLine: true, Submit: true},
+		progress:      0.0,
+		goButton:      &widget.Clickable{},
+		backButton:    &widget.Clickable{},
+		forwardButton: &widget.Clickable{},
+		refreshButton: &widget.Clickable{},
 	}
 }
 
@@ -63,6 +69,9 @@ func (t *toolbar) Render(gtx layout.Context, theme *material.Theme, currTabIdx i
 				Alignment: layout.Middle,
 				Spacing:   layout.SpaceEvenly,
 			}.Layout(gtx,
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return t.renderNavigationButtons(gtx, theme, currTabIdx)
+				}),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 					return t.renderURLBarWithProgress(gtx, theme, currTabIdx)
 				}),
@@ -89,6 +98,15 @@ func (t *toolbar) renderURLBarWithProgress(gtx layout.Context, theme *material.T
 }
 
 func (t *toolbar) renderURLBar(gtx layout.Context, theme *material.Theme, currTabIdx int) layout.Dimensions {
+	// Update URL editor with current tab's URL
+	tab := t.engine.GetTab(currTabIdx)
+	if tab != nil && t.urlEditor.Text() == "" {
+		currentURL := tab.GetURL()
+		if currentURL != "" {
+			t.urlEditor.SetText(currentURL)
+		}
+	}
+
 	if event, hasEvent := t.urlEditor.Update(gtx); hasEvent {
 		if _, isSubmit := event.(widget.SubmitEvent); isSubmit {
 			go t.handleNavigate(currTabIdx)
@@ -132,6 +150,70 @@ func (t *toolbar) renderProgressBar(gtx layout.Context) layout.Dimensions {
 	}
 
 	return layout.Dimensions{Size: image.Pt(totalWidth, progressBarHeight)}
+}
+
+func (t *toolbar) renderNavigationButtons(gtx layout.Context, theme *material.Theme, currTabIdx int) layout.Dimensions {
+	tab := t.engine.GetTab(currTabIdx)
+	canGoBack := tab != nil && tab.CanGoBack()
+	canGoNext := tab != nil && tab.CanGoNext()
+
+	return layout.Flex{
+		Axis:    layout.Horizontal,
+		Spacing: layout.SpaceAround,
+	}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return t.renderBackButton(gtx, theme, currTabIdx, canGoBack)
+		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return t.renderForwardButton(gtx, theme, currTabIdx, canGoNext)
+		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return t.renderRefreshButton(gtx, theme, currTabIdx)
+		}),
+	)
+}
+
+func (t *toolbar) renderBackButton(gtx layout.Context, theme *material.Theme, currTabIdx int, enabled bool) layout.Dimensions {
+	if enabled && t.backButton.Clicked(gtx) {
+		tab := t.engine.GetTab(currTabIdx)
+		if tab != nil {
+			tab.GoBack()
+		}
+	}
+
+	btn := material.Button(theme, t.backButton, "←")
+	if !enabled {
+		btn.Color = color.NRGBA{R: 200, G: 200, B: 200, A: 255} // Gray for disabled
+	}
+	return btn.Layout(gtx)
+}
+
+func (t *toolbar) renderForwardButton(gtx layout.Context, theme *material.Theme, currTabIdx int, enabled bool) layout.Dimensions {
+	if enabled && t.forwardButton.Clicked(gtx) {
+		tab := t.engine.GetTab(currTabIdx)
+		if tab != nil {
+			tab.GoNext()
+		}
+	}
+
+	btn := material.Button(theme, t.forwardButton, "→")
+	if !enabled {
+		btn.Color = color.NRGBA{R: 200, G: 200, B: 200, A: 255} // Gray for disabled
+	}
+	return btn.Layout(gtx)
+}
+
+func (t *toolbar) renderRefreshButton(gtx layout.Context, theme *material.Theme, currTabIdx int) layout.Dimensions {
+	if t.refreshButton.Clicked(gtx) {
+		t.engine.RefreshTab(currTabIdx)
+		t.SetProgress(0.1)
+		go func() {
+			t.SetProgress(1.0)
+		}()
+	}
+
+	btn := material.Button(theme, t.refreshButton, "⟳")
+	return btn.Layout(gtx)
 }
 
 func (t *toolbar) renderActionButtons(gtx layout.Context, theme *material.Theme, currTabIdx int) layout.Dimensions {

@@ -184,7 +184,7 @@ func (t *tokenizer) extractAttributes(isClosing bool) map[string]string {
 
 func (t *tokenizer) parseSingleAttribute() attribute {
 	t.skipWhitespace()
-	if !(t.HasMore() && t.current != '>' && t.current != '/') {
+	if !t.HasMore() || t.current == '>' || t.current == '/' {
 		return attribute{}
 	}
 

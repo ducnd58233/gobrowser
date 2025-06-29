@@ -47,41 +47,70 @@ type style struct {
 func NewStyle() Style {
 	return &style{
 		properties: map[string]CSSValue{
-			PropColor:           {Raw: DefaultTextColor, ValueType: CSSValueColor},
-			PropBackgroundColor: {Raw: DefaultBgColor, ValueType: CSSValueColor},
-			PropFontFamily:      {Raw: DefaultTextFont, ValueType: CSSValueKeyword},
-			PropFontSize:        {Raw: "16px", ValueType: CSSValueLength, Number: 16, Unit: "px"},
-			PropFontWeight:      {Raw: ValueNormal, ValueType: CSSValueKeyword},
-			PropFontStyle:       {Raw: ValueNormal, ValueType: CSSValueKeyword},
-			PropTextAlign:       {Raw: ValueLeft, ValueType: CSSValueKeyword},
-			PropDisplay:         {Raw: ValueBlock, ValueType: CSSValueKeyword},
-			PropMargin:          {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
-			PropPadding:         {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
-			PropBorder:          {Raw: ValueNone, ValueType: CSSValueKeyword},
-			PropWidth:           {Raw: ValueAuto, ValueType: CSSValueKeyword},
-			PropHeight:          {Raw: ValueAuto, ValueType: CSSValueKeyword},
-			PropPosition:        {Raw: ValueStatic, ValueType: CSSValueKeyword},
-			PropOpacity:         {Raw: "1", ValueType: CSSValueNumber, Number: 1},
-			PropVisibility:      {Raw: ValueVisible, ValueType: CSSValueKeyword},
-			PropOverflow:        {Raw: ValueVisible, ValueType: CSSValueKeyword},
-			PropTextDecoration:  {Raw: ValueNone, ValueType: CSSValueKeyword},
-			PropLineHeight:      {Raw: ValueNormal, ValueType: CSSValueKeyword},
+			PropColor:             {Raw: DefaultTextColor, ValueType: CSSValueColor},
+			PropBackgroundColor:   {Raw: DefaultBgColor, ValueType: CSSValueColor},
+			PropFontFamily:        {Raw: DefaultTextFont, ValueType: CSSValueKeyword},
+			PropFontSize:          {Raw: "16px", ValueType: CSSValueLength, Number: 16, Unit: "px"},
+			PropFontWeight:        {Raw: ValueNormal, ValueType: CSSValueKeyword},
+			PropFontStyle:         {Raw: ValueNormal, ValueType: CSSValueKeyword},
+			PropTextAlign:         {Raw: ValueLeft, ValueType: CSSValueKeyword},
+			PropTextDecoration:    {Raw: ValueNone, ValueType: CSSValueKeyword},
+			PropDisplay:           {Raw: ValueBlock, ValueType: CSSValueKeyword},
+			PropMargin:            {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropMarginTop:         {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropMarginRight:       {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropMarginBottom:      {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropMarginLeft:        {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropPadding:           {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropPaddingTop:        {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropPaddingRight:      {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropPaddingBottom:     {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropPaddingLeft:       {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropBorder:            {Raw: ValueNone, ValueType: CSSValueKeyword},
+			PropWidth:             {Raw: ValueAuto, ValueType: CSSValueKeyword},
+			PropHeight:            {Raw: ValueAuto, ValueType: CSSValueKeyword},
+			PropMinWidth:          {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropMinHeight:         {Raw: "0", ValueType: CSSValueLength, Number: 0, Unit: "px"},
+			PropMaxWidth:          {Raw: ValueNone, ValueType: CSSValueKeyword},
+			PropMaxHeight:         {Raw: ValueNone, ValueType: CSSValueKeyword},
+			PropPosition:          {Raw: ValueStatic, ValueType: CSSValueKeyword},
+			PropTop:               {Raw: ValueAuto, ValueType: CSSValueKeyword},
+			PropRight:             {Raw: ValueAuto, ValueType: CSSValueKeyword},
+			PropBottom:            {Raw: ValueAuto, ValueType: CSSValueKeyword},
+			PropLeft:              {Raw: ValueAuto, ValueType: CSSValueKeyword},
+			PropZIndex:            {Raw: ValueAuto, ValueType: CSSValueKeyword},
+			PropOpacity:           {Raw: "1", ValueType: CSSValueNumber, Number: 1},
+			PropVisibility:        {Raw: ValueVisible, ValueType: CSSValueKeyword},
+			PropOverflow:          {Raw: ValueVisible, ValueType: CSSValueKeyword},
+			PropOverflowX:         {Raw: ValueVisible, ValueType: CSSValueKeyword},
+			PropOverflowY:         {Raw: ValueVisible, ValueType: CSSValueKeyword},
+			PropLineHeight:        {Raw: ValueNormal, ValueType: CSSValueKeyword},
+			PropLetterSpacing:     {Raw: ValueNormal, ValueType: CSSValueKeyword},
+			PropWordSpacing:       {Raw: ValueNormal, ValueType: CSSValueKeyword},
+			PropTextTransform:     {Raw: ValueNone, ValueType: CSSValueKeyword},
+			PropWhiteSpace:        {Raw: ValueNormal, ValueType: CSSValueKeyword},
+			PropCursor:            {Raw: ValueAuto, ValueType: CSSValueKeyword},
+			PropListStyle:         {Raw: ValueNone, ValueType: CSSValueKeyword},
+			PropListStyleType:     {Raw: "disc", ValueType: CSSValueKeyword},
+			PropListStylePosition: {Raw: "outside", ValueType: CSSValueKeyword},
 		},
 		inherited: map[string]bool{
-			PropColor:         true,
-			PropFontFamily:    true,
-			PropFontSize:      true,
-			PropFontWeight:    true,
-			PropFontStyle:     true,
-			PropTextAlign:     true,
-			PropLineHeight:    true,
-			PropLetterSpacing: true,
-			PropWordSpacing:   true,
-			PropTextTransform: true,
-			PropWhiteSpace:    true,
-			PropVisibility:    true,
-			PropCursor:        true,
-			PropListStyle:     true,
+			PropColor:             true,
+			PropFontFamily:        true,
+			PropFontSize:          true,
+			PropFontWeight:        true,
+			PropFontStyle:         true,
+			PropTextAlign:         true,
+			PropTextTransform:     true,
+			PropLineHeight:        true,
+			PropLetterSpacing:     true,
+			PropWordSpacing:       true,
+			PropWhiteSpace:        true,
+			PropVisibility:        true,
+			PropCursor:            true,
+			PropListStyle:         true,
+			PropListStyleType:     true,
+			PropListStylePosition: true,
 		},
 	}
 }
@@ -387,7 +416,6 @@ func (m *selectorMatcher) matchesPseudoSelector(node Node, pseudoClass string) b
 	case "root":
 		return node.GetParent() == nil
 	default:
-		// For unknown pseudo-classes, return false
 		return false
 	}
 }
@@ -536,7 +564,6 @@ func (m *selectorMatcher) matchesAdjacentSiblingSelector(node Node, selector str
 		return false
 	}
 
-	// Find previous sibling element
 	parent := node.GetParent()
 	if parent == nil {
 		return false
@@ -545,7 +572,6 @@ func (m *selectorMatcher) matchesAdjacentSiblingSelector(node Node, selector str
 	children := parent.GetChildren()
 	for i, child := range children {
 		if child == node && i > 0 {
-			// Check previous element sibling
 			for j := i - 1; j >= 0; j-- {
 				if children[j].GetType() == ElementNodeType {
 					return m.matchesSimpleSelector(children[j], firstSelector)
@@ -562,15 +588,12 @@ func (m *selectorMatcher) matchesGeneralSiblingSelector(node Node, selector stri
 	if len(parts) != 2 {
 		return false
 	}
-
 	firstSelector := strings.TrimSpace(parts[0])
 	secondSelector := strings.TrimSpace(parts[1])
 
 	if !m.matchesSimpleSelector(node, secondSelector) {
 		return false
 	}
-
-	// Find any previous sibling element that matches
 	parent := node.GetParent()
 	if parent == nil {
 		return false

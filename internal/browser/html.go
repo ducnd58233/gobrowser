@@ -32,6 +32,7 @@ func NewHTMLSpecialTags() HTMLSpecialTags {
 			"dt": true, "dd": true, "figure": true, "figcaption": true,
 			"main": true, "div": true, "table": true, "form": true,
 			"fieldset": true, "legend": true, "details": true, "summary": true,
+			"code": true, "button": true,
 		},
 	}
 }
@@ -147,6 +148,8 @@ func (p *htmlParser) handleStartTag(token *Token, state *parserState) {
 		p.handleStructuralTag(token, node, state)
 		return
 	}
+
+	p.processSemanticTag(token.Tag, node, token.Attributes)
 
 	if state.inHead {
 		p.extractHeadData(token)
@@ -368,4 +371,32 @@ func (p *htmlParser) printNodeRecursive(node Node, depth int) string {
 	}
 
 	return result
+}
+
+func (p *htmlParser) processSemanticTag(tag string, node Node, attributes map[string]string) {
+	switch tag {
+	case "a":
+		if href, exists := attributes["href"]; exists {
+			node.SetAttribute("href", href)
+			node.SetAttribute("role", "link")
+		}
+	case "nav":
+		node.SetAttribute("role", "navigation")
+	case "button":
+		node.SetAttribute("role", "button")
+		if buttonType, exists := attributes["type"]; !exists {
+			node.SetAttribute("type", "button")
+		} else {
+			node.SetAttribute("type", buttonType)
+		}
+	case "pre", "code":
+		node.SetAttribute("whitespace", "pre")
+		if lang, exists := attributes["class"]; exists && strings.HasPrefix(lang, "language-") {
+			node.SetAttribute("syntax-highlight", strings.TrimPrefix(lang, "language-"))
+		}
+	case "ul", "ol":
+		node.SetAttribute("role", "list")
+	case "li":
+		node.SetAttribute("role", "listitem")
+	}
 }

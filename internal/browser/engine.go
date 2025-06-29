@@ -16,6 +16,7 @@ type Engine interface {
 	CloseTab(idx int)
 	RefreshTab(idx int)
 	FetchContent(ctx context.Context, tabIdx int, rawURL string) error
+	SetDebugMode(enabled bool)
 }
 
 type engine struct {
@@ -25,6 +26,7 @@ type engine struct {
 
 	urlNormalizer   URLNormalizer
 	documentBuilder DocumentBuilder
+	debugMode       bool
 }
 
 func NewEngine() Engine {
@@ -41,6 +43,7 @@ func NewEngine() Engine {
 		tabs:            make([]Tab, 0),
 		urlNormalizer:   NewURLNormalizer(),
 		documentBuilder: NewDocumentBuilder(),
+		debugMode:       false,
 	}
 }
 
@@ -115,7 +118,7 @@ func (e *engine) FetchContent(ctx context.Context, tabIdx int, rawURL string) er
 		return err
 	}
 
-	tab.SetContent(doc)
+	tab.SetDocument(doc)
 
 	return nil
 }
@@ -149,4 +152,11 @@ func (e *engine) fetchHTTPContent(ctx context.Context, urlStr string) (string, e
 	}
 
 	return string(content), nil
+}
+
+func (e *engine) SetDebugMode(enabled bool) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	e.debugMode = enabled
+	e.documentBuilder.SetDebugMode(enabled)
 }
