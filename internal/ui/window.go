@@ -111,6 +111,7 @@ func (mw *mainWindow) handleFrameEvent(ops *op.Ops, e app.FrameEvent) {
 	gtx := app.NewContext(ops, e)
 	mw.render(gtx)
 	e.Frame(gtx.Ops)
+	mw.window.Invalidate()
 }
 
 func (mw *mainWindow) render(gtx layout.Context) layout.Dimensions {

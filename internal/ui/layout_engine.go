@@ -12,6 +12,7 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"gioui.org/widget/material"
 
 	"github.com/ducnd58233/gobrowser/internal/browser"
@@ -599,14 +600,16 @@ func (bl *BlockLayout) IsVisible(viewportY, viewportHeight float64) bool {
 }
 
 type InlineLayout struct {
-	node    browser.Node
-	text    string
-	x, y    float64
-	width   float64
-	height  float64
-	style   browser.Style
-	metrics TextMetrics
-	deps    LayoutEngineDependencies
+	node      browser.Node
+	text      string
+	x, y      float64
+	width     float64
+	height    float64
+	style     browser.Style
+	metrics   TextMetrics
+	deps      LayoutEngineDependencies
+	clickable *widget.Clickable
+	hovered   bool
 }
 
 func NewInlineLayout(node browser.Node, style browser.Style, text string, deps LayoutEngineDependencies) *InlineLayout {
@@ -615,6 +618,9 @@ func NewInlineLayout(node browser.Node, style browser.Style, text string, deps L
 		text:  text,
 		style: style,
 		deps:  deps,
+	}
+	if node.GetTag() == "a" {
+		il.clickable = &widget.Clickable{}
 	}
 
 	il.calculateTextMetrics()
@@ -661,9 +667,14 @@ func (il *InlineLayout) Paint(displayList DisplayList) {
 		return
 	}
 
+	isLink := il.node.GetTag() == "a"
 	textColor := il.deps.Cache.GetColor(il.style.GetProperty(browser.PropColor).Raw, il.deps.ColorParser)
-	if textColor.A == 0 {
-		textColor = color.NRGBA{R: 0, G: 0, B: 0, A: 255}
+	if isLink {
+		if il.hovered {
+			textColor = color.NRGBA{R: 0, G: 0, B: 180, A: 255}
+		} else {
+			textColor = color.NRGBA{R: 0, G: 0, B: 238, A: 255}
+		}
 	}
 
 	if il.isPreformattedText() {
@@ -939,7 +950,7 @@ func (pl *PreformattedLayout) Layout(width float64) float64 {
 		currentY += childHeight
 	}
 
-	pl.height = (currentY - pl.y) + pl.padding.bottom + pl.margin.bottom
+	pl.height = (currentY - pl.y) + pl.padding.bottom + pl.margin.bottom - (contentY - pl.y)
 	return pl.height
 }
 

@@ -55,6 +55,7 @@ type DocumentBuilder interface {
 
 type documentBuilder struct {
 	apiHandler    APIHandler
+	urlResolver   URLResolver
 	htmlParser    HTMLParser
 	cssParser     CSSParser
 	cssApplicator CSSApplicator
@@ -66,6 +67,7 @@ func NewDocumentBuilder() DocumentBuilder {
 		cssApplicator: NewCSSApplicator(),
 		debugMode:     false,
 		apiHandler:    NewAPIHandler(),
+		urlResolver:   NewURLResolver(),
 	}
 }
 
@@ -128,7 +130,6 @@ func (db *documentBuilder) parseHTML(content string, doc *document) error {
 	return nil
 }
 
-// parseCSS extracts and parses CSS from style tags and inline styles
 func (db *documentBuilder) parseCSS(doc *document) error {
 	styleContent := db.htmlParser.GetStyleTags()
 	stylesheetURLs := db.htmlParser.GetStylesheetLinks()
@@ -144,6 +145,8 @@ func (db *documentBuilder) parseCSS(doc *document) error {
 	if db.debugMode {
 		log.Println("CSS Parser Output:")
 		log.Println(css.PrintTree())
+		log.Println("External CSS content:")
+		log.Println(externalCSS)
 	}
 
 	doc.stylesheet = css
@@ -158,8 +161,21 @@ func (db *documentBuilder) fetchExternalStylesheets(urls []string) string {
 	var combinedCSS strings.Builder
 	cssChannel := make(chan string, len(urls))
 
-	for _, url := range urls {
-		go db.fetchStylesheetAsync(url, cssChannel)
+	baseURL := ""
+	if db.htmlParser != nil {
+		if metaURL, ok := db.htmlParser.GetMetadata()["url"]; ok {
+			baseURL = metaURL
+		}
+	}
+
+	for _, link := range urls {
+		resolvedURL := link
+		if baseURL != "" {
+			if absURL, err := db.urlResolver.Resolve(baseURL, link); err == nil {
+				resolvedURL = absURL
+			}
+		}
+		go db.fetchStylesheetAsync(resolvedURL, cssChannel)
 	}
 
 	for i := 0; i < len(urls); i++ {

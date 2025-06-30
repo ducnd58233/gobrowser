@@ -28,6 +28,8 @@ type toolbar struct {
 	backButton    *widget.Clickable
 	forwardButton *widget.Clickable
 	refreshButton *widget.Clickable
+	lastTabIndex  int
+	lastTabURL    string
 }
 
 func NewToolbar(engine browser.Engine) Toolbar {
@@ -98,11 +100,25 @@ func (t *toolbar) renderURLBarWithProgress(gtx layout.Context, theme *material.T
 }
 
 func (t *toolbar) renderURLBar(gtx layout.Context, theme *material.Theme, currTabIdx int) layout.Dimensions {
-	// Update URL editor with current tab's URL
 	tab := t.engine.GetTab(currTabIdx)
-	if tab != nil && t.urlEditor.Text() == "" {
+
+	if tab != nil {
 		currentURL := tab.GetURL()
-		if currentURL != "" {
+
+		shouldUpdate := false
+
+		if currTabIdx != t.lastTabIndex {
+			shouldUpdate = true
+			t.lastTabIndex = currTabIdx
+		}
+		if currentURL != t.lastTabURL {
+			if t.urlEditor.Text() == t.lastTabURL {
+				shouldUpdate = true
+			}
+			t.lastTabURL = currentURL
+		}
+
+		if shouldUpdate && currentURL != "" {
 			t.urlEditor.SetText(currentURL)
 		}
 	}
@@ -238,6 +254,10 @@ func (t *toolbar) handleNavigate(currTabIdx int) {
 
 	t.SetProgress(0.1)
 	tab.Navigate(url)
+
+	// Update tracking state
+	t.lastTabIndex = currTabIdx
+	t.lastTabURL = url
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), browser.DefaultTimeout)

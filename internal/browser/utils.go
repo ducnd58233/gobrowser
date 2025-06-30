@@ -416,3 +416,45 @@ func (ah *apiHandler) unregisterRequest(urlStr string) {
 	defer ah.requestMutex.Unlock()
 	delete(ah.activeRequests, urlStr)
 }
+
+type URLResolver interface {
+	Resolve(baseURL, relativeURL string) (string, error)
+}
+
+type urlResolver struct{}
+
+func NewURLResolver() URLResolver {
+	return &urlResolver{}
+}
+
+func (r *urlResolver) Resolve(baseURL, relativeURL string) (string, error) {
+	if relativeURL == "" {
+		return "", ErrInvalidURL
+	}
+	if strings.Contains(relativeURL, "://") {
+		return relativeURL, nil
+	}
+	parsedBase, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+	if strings.HasPrefix(relativeURL, "//") {
+		return parsedBase.Scheme + ":" + relativeURL, nil
+	}
+	if strings.HasPrefix(relativeURL, "/") {
+		return parsedBase.Scheme + "://" + parsedBase.Host + relativeURL, nil
+	}
+	// Handle .. in relative path
+	basePath := parsedBase.Path
+	if !strings.HasSuffix(basePath, "/") {
+		basePath = basePath[:strings.LastIndex(basePath, "/")+1]
+	}
+	for strings.HasPrefix(relativeURL, "../") {
+		relativeURL = relativeURL[3:]
+		if basePath != "/" {
+			basePath = basePath[:strings.LastIndex(basePath[:len(basePath)-1], "/")+1]
+		}
+	}
+	absPath := basePath + relativeURL
+	return parsedBase.Scheme + "://" + parsedBase.Host + absPath, nil
+}
