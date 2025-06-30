@@ -26,9 +26,40 @@ type mainWindow struct {
 
 	tabView         TabView
 	toolbar         Toolbar
+	contentRenderer ContentRenderer
 }
 
 func NewMainWindow(isDebugMode bool) MainWindow {
+	window := createAppWindow()
+
+	engine := browser.NewEngine()
+	engine.SetDebugMode(isDebugMode)
+	engine.AddTab()
+
+	theme := createTheme()
+
+	layoutEngineDeps := LayoutEngineDependencies{
+		ColorParser: browser.NewColorParser(),
+		UnitParser:  browser.NewUnitParser(),
+		Cache:       NewLayoutCache(),
+	}
+	contentRendererDeps := ContentRendererDependencies{
+		Engine:       engine,
+		LayoutEngine: NewLayoutEngine(layoutEngineDeps),
+		DebugMode:    isDebugMode,
+	}
+
+	return &mainWindow{
+		window:          window,
+		theme:           theme,
+		engine:          engine,
+		tabView:         NewTabView(engine),
+		toolbar:         NewToolbar(engine),
+		contentRenderer: NewContentRenderer(contentRendererDeps),
+	}
+}
+
+func createAppWindow() *app.Window {
 	window := &app.Window{}
 	window.Option(
 		app.Title(AppName),
@@ -41,44 +72,45 @@ func NewMainWindow(isDebugMode bool) MainWindow {
 			unit.Dp(WindowMinHeight),
 		),
 	)
+	return window
+}
 
-	engine := browser.NewEngine()
-	engine.SetDebugMode(isDebugMode)
-	engine.AddTab()
-
+func createTheme() *material.Theme {
 	theme := material.NewTheme()
 	theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
-
-
-	return &mainWindow{
-		window:          window,
-		theme:           theme,
-		engine:          engine,
-		tabView:         NewTabView(engine),
-		toolbar:         NewToolbar(engine),
-	}
+	return theme
 }
 
 func (mw *mainWindow) Run() {
-	go func() {
-		var ops op.Ops
-
-		for {
-			event := mw.window.Event()
-			switch e := event.(type) {
-			case app.DestroyEvent:
-				if e.Err != nil {
-					log.Fatalf("Window destroy error: %v", e.Err)
-				}
-				os.Exit(0)
-			case app.FrameEvent:
-				gtx := app.NewContext(&ops, e)
-				mw.render(gtx)
-				e.Frame(gtx.Ops)
-			}
-		}
-	}()
+	go mw.runEventLoop()
 	app.Main()
+}
+
+func (mw *mainWindow) runEventLoop() {
+	var ops op.Ops
+
+	for {
+		event := mw.window.Event()
+		switch e := event.(type) {
+		case app.DestroyEvent:
+			mw.handleDestroyEvent(e)
+		case app.FrameEvent:
+			mw.handleFrameEvent(&ops, e)
+		}
+	}
+}
+
+func (mw *mainWindow) handleDestroyEvent(e app.DestroyEvent) {
+	if e.Err != nil {
+		log.Fatalf("Window destroy error: %v", e.Err)
+	}
+	os.Exit(0)
+}
+
+func (mw *mainWindow) handleFrameEvent(ops *op.Ops, e app.FrameEvent) {
+	gtx := app.NewContext(ops, e)
+	mw.render(gtx)
+	e.Frame(gtx.Ops)
 }
 
 func (mw *mainWindow) render(gtx layout.Context) layout.Dimensions {
@@ -88,6 +120,9 @@ func (mw *mainWindow) render(gtx layout.Context) layout.Dimensions {
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return mw.toolbar.Render(gtx, mw.theme, mw.tabView.GetCurrentTabIndex())
+		}),
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			return mw.contentRenderer.Render(gtx, mw.theme, mw.tabView.GetCurrentTabIndex())
 		}),
 	)
 }

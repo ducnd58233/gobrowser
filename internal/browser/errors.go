@@ -28,7 +28,6 @@ func (e *BrowserError) Error() string {
 	return fmt.Sprintf("%v: %s", e.Type, e.Message)
 }
 
-// NewBrowserError creates a new browser error
 func NewBrowserError(errType error, message string) error {
 	return &BrowserError{
 		Type:    errType,
@@ -36,7 +35,6 @@ func NewBrowserError(errType error, message string) error {
 	}
 }
 
-// NewBrowserErrorWithContext creates a new browser error with context
 func NewBrowserErrorWithContext(errType error, message, context string) error {
 	return &BrowserError{
 		Type:    errType,

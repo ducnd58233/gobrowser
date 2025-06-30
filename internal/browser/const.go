@@ -3,18 +3,17 @@ package browser
 import "time"
 
 const (
-	DefaultUserAgent         = "GoBrowser/1.0"
+	DefaultUserAgent = "GoBrowser/1.0"
+
 	IDByteLength             = 8
 	MaxConcurrentConnections = 10
 	DefaultTimeout           = 30 * time.Second
 	KeepAliveTimeout         = 30 * time.Second
-
-	Important = "!important"
 )
 
 // Layout and Typography
 const (
-	DefaultFontSize      = 16.0
+	DefaultFontSize      = 12.0
 	DefaultLineHeight    = 20.0
 	MinFontSize          = 8.0
 	MaxFontSize          = 72.0

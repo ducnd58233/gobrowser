@@ -18,10 +18,6 @@ import (
 type TabView interface {
 	Render(gtx layout.Context, theme *material.Theme) layout.Dimensions
 	GetCurrentTabIndex() int
-	SetCurrentTabIndex(index int)
-	HandleTabClick(index int)
-	HandleCloseTab(index int)
-	HandleNewTab()
 }
 
 type tabView struct {
@@ -32,7 +28,6 @@ type tabView struct {
 	newTabButton *widget.Clickable
 	colorParser  browser.ColorParser
 
-	// Hover states for better UX
 	tabHoverStates   []bool
 	closeHoverStates []bool
 }
@@ -50,7 +45,6 @@ func NewTabView(engine browser.Engine) TabView {
 	}
 }
 
-// parseColor is a helper method to parse hex colors with error handling
 func (t *tabView) parseColor(hexStr string) color.NRGBA {
 	if hexStr == "" {
 		return color.NRGBA{R: 0, G: 0, B: 0, A: 255}
@@ -58,7 +52,6 @@ func (t *tabView) parseColor(hexStr string) color.NRGBA {
 
 	r, g, b, a, err := t.colorParser.ParseColor(hexStr)
 	if err != nil {
-		// Return default color on error
 		return color.NRGBA{R: 0, G: 0, B: 0, A: 255}
 	}
 
@@ -77,7 +70,6 @@ func (t *tabView) renderTabs(theme *material.Theme) []layout.FlexChild {
 	tabCount := t.engine.GetTabCount()
 	t.ensureTabButtonsCapacity(tabCount)
 
-	// Render existing tabs
 	for i := 0; i < tabCount; i++ {
 		tab := t.engine.GetTab(i)
 		if tab == nil {
@@ -85,23 +77,22 @@ func (t *tabView) renderTabs(theme *material.Theme) []layout.FlexChild {
 		}
 
 		children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			// Handle tab click
 			if t.tabButtons[i].Clicked(gtx) {
-				t.HandleTabClick(i)
+				t.currentIdx = i
 			}
 
-			// Handle close button click
 			if t.closeButtons[i].Clicked(gtx) {
-				t.HandleCloseTab(i)
-				// Adjust tab count and break to avoid accessing invalid indices
+				t.engine.CloseTab(i)
 				tabCount = t.engine.GetTabCount()
+				if t.currentIdx >= tabCount {
+					t.currentIdx = tabCount - 1
+				}
 			}
 
 			return t.renderTab(gtx, theme, tab, i)
 		}))
 	}
 
-	// Add new tab button
 	children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 		return t.renderNewTabButton(gtx, theme)
 	}))
@@ -113,18 +104,15 @@ func (t *tabView) renderTab(gtx layout.Context, theme *material.Theme, tab brows
 	isActive := index == t.currentIdx
 	tabTitle := t.getTabTitle(tab)
 
-	// Calculate tab dimensions
 	minSize := image.Pt(gtx.Dp(unit.Dp(TabMinWidth)), gtx.Dp(unit.Dp(TabBarHeight)))
 	maxSize := image.Pt(gtx.Dp(unit.Dp(TabMaxWidth)), gtx.Dp(unit.Dp(TabBarHeight)))
 
-	// Use flex layout for tab content
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-			// Constrain tab size
 			gtx.Constraints.Min = minSize
 			gtx.Constraints.Max = maxSize
 
-			return t.renderTabBackground(gtx, theme, isActive, func(gtx layout.Context) layout.Dimensions {
+			return t.renderTabBackground(gtx, isActive, func(gtx layout.Context) layout.Dimensions {
 				return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
 					// Tab title
 					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
@@ -140,8 +128,7 @@ func (t *tabView) renderTab(gtx layout.Context, theme *material.Theme, tab brows
 	)
 }
 
-func (t *tabView) renderTabBackground(gtx layout.Context, theme *material.Theme, isActive bool, w layout.Widget) layout.Dimensions {
-	// Choose background color based on state
+func (t *tabView) renderTabBackground(gtx layout.Context, isActive bool, w layout.Widget) layout.Dimensions {
 	var bgColor color.NRGBA
 	if isActive {
 		bgColor = t.parseColor(TabColorActive)
@@ -164,7 +151,6 @@ func (t *tabView) renderTabBackground(gtx layout.Context, theme *material.Theme,
 }
 
 func (t *tabView) renderTabButton(gtx layout.Context, theme *material.Theme, title string, index int, isActive bool) layout.Dimensions {
-	// Style the text based on active state
 	var textColor color.NRGBA
 	if isActive {
 		textColor = t.parseColor(TabTextActive)
@@ -183,7 +169,6 @@ func (t *tabView) renderTabButton(gtx layout.Context, theme *material.Theme, tit
 }
 
 func (t *tabView) renderCloseButton(gtx layout.Context, theme *material.Theme, index int, isActive bool) layout.Dimensions {
-	// Style close button
 	buttonColor := t.parseColor(CloseButtonColor)
 	if isActive {
 		buttonColor = t.parseColor(TabTextActive)
@@ -193,8 +178,7 @@ func (t *tabView) renderCloseButton(gtx layout.Context, theme *material.Theme, i
 		size := gtx.Dp(unit.Dp(CloseButtonSize))
 		gtx.Constraints = layout.Exact(image.Pt(size, size))
 
-		// Draw close button
-		return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			label := material.Body1(theme, CloseTabText)
 			label.Color = buttonColor
 			label.Alignment = text.Middle
@@ -204,9 +188,11 @@ func (t *tabView) renderCloseButton(gtx layout.Context, theme *material.Theme, i
 }
 
 func (t *tabView) renderNewTabButton(gtx layout.Context, theme *material.Theme) layout.Dimensions {
-	// Handle new tab button click
 	if t.newTabButton.Clicked(gtx) {
-		t.HandleNewTab()
+		newTab := t.engine.AddTab()
+		if newTab != nil {
+			t.currentIdx = t.engine.GetTabCount() - 1
+		}
 	}
 
 	buttonSize := gtx.Dp(unit.Dp(TabBarHeight))
@@ -214,13 +200,11 @@ func (t *tabView) renderNewTabButton(gtx layout.Context, theme *material.Theme) 
 	return material.Clickable(gtx, t.newTabButton, func(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints = layout.Exact(image.Pt(buttonSize, buttonSize))
 
-		// Draw button background
 		bgColor := t.parseColor(TabColorInactive)
 		defer clip.Rect{Max: gtx.Constraints.Max}.Push(gtx.Ops).Pop()
 		paint.ColorOp{Color: bgColor}.Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 
-		// Draw plus icon
 		return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			label := material.Body1(theme, AddTabText)
 			label.Color = t.parseColor(TabTextInactive)
@@ -230,7 +214,6 @@ func (t *tabView) renderNewTabButton(gtx layout.Context, theme *material.Theme) 
 }
 
 func (t *tabView) drawTabBorder(gtx layout.Context, borderColor color.NRGBA) {
-	// Draw border around tab (simple implementation)
 	borderWidth := gtx.Dp(unit.Dp(1))
 	size := gtx.Constraints.Max
 
@@ -248,7 +231,6 @@ func (t *tabView) drawTabBorder(gtx layout.Context, borderColor color.NRGBA) {
 }
 
 func (t *tabView) ensureTabButtonsCapacity(tabCount int) {
-	// Expand tab buttons slice if needed
 	for len(t.tabButtons) < tabCount {
 		t.tabButtons = append(t.tabButtons, &widget.Clickable{})
 		t.closeButtons = append(t.closeButtons, &widget.Clickable{})
@@ -272,52 +254,4 @@ func (t *tabView) getTabTitle(tab browser.Tab) string {
 
 func (t *tabView) GetCurrentTabIndex() int {
 	return t.currentIdx
-}
-
-func (t *tabView) SetCurrentTabIndex(index int) {
-	tabCount := t.engine.GetTabCount()
-	if index >= 0 && index < tabCount {
-		t.currentIdx = index
-	}
-}
-
-func (t *tabView) HandleTabClick(index int) {
-	t.SetCurrentTabIndex(index)
-}
-
-func (t *tabView) HandleCloseTab(index int) {
-	tabCount := t.engine.GetTabCount()
-	if index < 0 || index >= tabCount {
-		return
-	}
-
-	// Don't close the last tab
-	if tabCount <= 1 {
-		return
-	}
-
-	t.engine.CloseTab(index)
-
-	// Adjust current tab index
-	newTabCount := t.engine.GetTabCount()
-	if t.currentIdx >= newTabCount {
-		t.currentIdx = newTabCount - 1
-	} else if t.currentIdx > index {
-		t.currentIdx--
-	}
-
-	// Shrink slices if needed
-	if len(t.tabButtons) > newTabCount {
-		t.tabButtons = t.tabButtons[:newTabCount]
-		t.closeButtons = t.closeButtons[:newTabCount]
-		t.tabHoverStates = t.tabHoverStates[:newTabCount]
-		t.closeHoverStates = t.closeHoverStates[:newTabCount]
-	}
-}
-
-func (t *tabView) HandleNewTab() {
-	newTab := t.engine.AddTab()
-	if newTab != nil {
-		t.currentIdx = t.engine.GetTabCount() - 1
-	}
 }

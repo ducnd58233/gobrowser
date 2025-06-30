@@ -35,8 +35,10 @@ type CSSValue struct {
 type Style interface {
 	GetProperty(property string) CSSValue
 	SetProperty(property string, value CSSValue)
-	GetInherited() map[string]bool
+	GetInheritedProperties() map[string]bool
 	IsInherited(property string) bool
+	Clone() Style
+	Merge(other Style)
 }
 
 type style struct {
@@ -115,7 +117,7 @@ func NewStyle() Style {
 	}
 }
 
-func (s *style) GetInherited() map[string]bool {
+func (s *style) GetInheritedProperties() map[string]bool {
 	return s.inherited
 }
 
@@ -137,15 +139,52 @@ func (s *style) IsInherited(property string) bool {
 	return false
 }
 
+func (s *style) Clone() Style {
+	cloned := &style{
+		properties: make(map[string]CSSValue),
+		inherited:  make(map[string]bool),
+	}
+
+	for key, value := range s.properties {
+		cloned.properties[key] = value
+	}
+
+	for key, value := range s.inherited {
+		cloned.inherited[key] = value
+	}
+
+	return cloned
+}
+
+func (s *style) Merge(other Style) {
+	if otherStyle, ok := other.(*style); ok {
+		for key, value := range otherStyle.properties {
+			s.properties[key] = value
+		}
+	}
+}
+
 type UnitParser interface {
 	ParseUnit(value string) (float64, string, bool)
 	ConvertToPixels(value float64, unit string, baseFontSize float64) float64
+	ResolveRelativeUnits(value CSSValue, baseFontSize float64) CSSValue
 }
 
-type unitParser struct{}
+type unitParser struct {
+	unitConversions map[string]float64
+}
 
 func NewUnitParser() UnitParser {
-	return &unitParser{}
+	return &unitParser{
+		unitConversions: map[string]float64{
+			"px": 1.0,
+			"pt": 1.333,  // 1pt = 1.333px at 96dpi
+			"pc": 16.0,   // 1pc = 16px
+			"in": 96.0,   // 1in = 96px at 96dpi
+			"cm": 37.795, // 1cm = 37.795px at 96dpi
+			"mm": 3.7795, // 1mm = 3.7795px at 96dpi
+		},
+	}
 }
 
 func (up *unitParser) ParseUnit(value string) (float64, string, bool) {
@@ -159,8 +198,7 @@ func (up *unitParser) ParseUnit(value string) (float64, string, bool) {
 		return number, "", true
 	}
 
-	// Match number with unit
-	pattern := regexp.MustCompile(`^([+-]?[0-9]*\.?[0-9]+)(px|em|rem|%|pt|pc|in|cm|mm|ex|ch|vw|vh|vmin|vmax|deg|rad|turn|s|ms)?$`)
+	pattern := regexp.MustCompile(`^([+-]?(?:\d*\.)?\d+)(px|em|rem|%|pt|pc|in|cm|mm|ex|ch|vw|vh|vmin|vmax|deg|rad|turn|s|ms)?$`)
 	matches := pattern.FindStringSubmatch(value)
 
 	if len(matches) >= 2 {
@@ -183,32 +221,58 @@ func (up *unitParser) ConvertToPixels(value float64, unit string, baseFontSize f
 	case "em":
 		return value * baseFontSize
 	case "rem":
-		return value * 16 // Default root font size
+		return value * DefaultFontSize
 	case "%":
 		return value / 100 * baseFontSize
-	case "pt":
-		return value * 1.333 // 1pt = 1.333px at 96dpi
-	case "pc":
-		return value * 16 // 1pc = 16px
-	case "in":
-		return value * 96 // 1in = 96px at 96dpi
-	case "cm":
-		return value * 37.795 // 1cm = 37.795px at 96dpi
-	case "mm":
-		return value * 3.7795 // 1mm = 3.7795px at 96dpi
+	case "ex":
+		return value * baseFontSize * 0.5
+	case "ch":
+		return value * baseFontSize * 0.5
+	case "vw":
+		return value * 8
+	case "vh":
+		return value * 8
+	case "vmin", "vmax":
+		return value * 8
 	default:
-		return value // Default to pixel value for unknown units
+		if conversion, exists := up.unitConversions[unit]; exists {
+			return value * conversion
+		}
+		return value
 	}
+}
+
+func (up *unitParser) ResolveRelativeUnits(value CSSValue, baseFontSize float64) CSSValue {
+	if value.ValueType != CSSValueLength && value.ValueType != CSSValuePercentage {
+		return value
+	}
+
+	if value.Unit == "em" || value.Unit == "rem" || value.Unit == "%" {
+		resolvedValue := up.ConvertToPixels(value.Number, value.Unit, baseFontSize)
+		return CSSValue{
+			Raw:       strconv.FormatFloat(resolvedValue, 'f', 2, 64) + "px",
+			ValueType: CSSValueLength,
+			Number:    resolvedValue,
+			Unit:      "px",
+		}
+	}
+
+	return value
 }
 
 type SelectorMatcher interface {
 	MatchesSelector(node Node, selector string) bool
+	CalculateSpecificity(selector string) int
 }
 
-type selectorMatcher struct{}
+type selectorMatcher struct {
+	selectorCache map[string]int
+}
 
 func NewSelectorMatcher() SelectorMatcher {
-	return &selectorMatcher{}
+	return &selectorMatcher{
+		selectorCache: make(map[string]int),
+	}
 }
 
 func (m *selectorMatcher) MatchesSelector(node Node, selector string) bool {
@@ -223,26 +287,91 @@ func (m *selectorMatcher) MatchesSelector(node Node, selector string) bool {
 		return m.matchesComplexSelector(node, selector)
 	}
 
-	// Handle direct child selector
 	if strings.Contains(selector, ">") {
 		return m.matchesChildSelector(node, selector)
 	}
 
-	// Handle adjacent sibling selector
 	if strings.Contains(selector, "+") {
 		return m.matchesAdjacentSiblingSelector(node, selector)
 	}
 
-	// Handle general sibling selector
 	if strings.Contains(selector, "~") {
 		return m.matchesGeneralSiblingSelector(node, selector)
 	}
 
-	// Handle simple selector
 	return m.matchesSimpleSelector(node, selector)
 }
 
-// MatchesSimpleSelector matches simple selectors (element, class, ID, attribute, pseudo)
+func (m *selectorMatcher) CalculateSpecificity(selector string) int {
+	if cached, exists := m.selectorCache[selector]; exists {
+		return cached
+	}
+
+	specificity := m.calculateSelectorSpecificity(selector)
+	m.selectorCache[selector] = specificity
+	return specificity
+}
+
+func (m *selectorMatcher) calculateSelectorSpecificity(selector string) int {
+	selector = strings.TrimSpace(selector)
+
+	// CSS specificity: inline=1000, IDs=100, classes/attributes/pseudo=10, elements=1
+	var idCount, classCount, elementCount int
+
+	// Count IDs
+	idMatches := regexp.MustCompile(`#[^\s#.\[:]+`).FindAllString(selector, -1)
+	idCount = len(idMatches)
+
+	// Count classes
+	classMatches := regexp.MustCompile(`\.[^\s#.\[:]+`).FindAllString(selector, -1)
+	classCount = len(classMatches)
+
+	// Count attributes
+	attributeMatches := regexp.MustCompile(`\[[^\]]*\]`).FindAllString(selector, -1)
+	classCount += len(attributeMatches)
+
+	// Count pseudo-classes (single colon, not double)
+	pseudoClassCount := m.countPseudoClasses(selector)
+	classCount += pseudoClassCount
+
+	cleanSelector := selector
+	cleanSelector = regexp.MustCompile(`#[^\s#.\[:]+`).ReplaceAllString(cleanSelector, "")
+	cleanSelector = regexp.MustCompile(`\.[^\s#.\[:]+`).ReplaceAllString(cleanSelector, "")
+	cleanSelector = regexp.MustCompile(`\[[^\]]*\]`).ReplaceAllString(cleanSelector, "")
+	cleanSelector = regexp.MustCompile(`::[^:\s\[]+`).ReplaceAllString(cleanSelector, " ")
+	cleanSelector = regexp.MustCompile(`:[^:\s\[]+`).ReplaceAllString(cleanSelector, "")
+
+	elementMatches := regexp.MustCompile(`\b[a-zA-Z][a-zA-Z0-9]*\b`).FindAllString(cleanSelector, -1)
+	for _, match := range elementMatches {
+		if !m.isCSSKeyword(match) {
+			elementCount++
+		}
+	}
+
+	return idCount*100 + classCount*10 + elementCount
+}
+
+func (m *selectorMatcher) countPseudoClasses(selector string) int {
+	count := 0
+	for i := 0; i < len(selector); i++ {
+		if i+1 < len(selector) && selector[i+1] == ':' {
+			i++ // Skip pseudo-element
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+func (m *selectorMatcher) isCSSKeyword(word string) bool {
+	keywords := map[string]bool{
+		"and": true, "not": true, "only": true,
+		"all": true, "screen": true, "print": true,
+	}
+	return keywords[strings.ToLower(word)]
+}
+
+// simple selectors (element, class, ID, attribute, pseudo)
 func (m *selectorMatcher) matchesSimpleSelector(node Node, selector string) bool {
 	if node.GetType() != ElementNodeType {
 		return false
@@ -250,14 +379,11 @@ func (m *selectorMatcher) matchesSimpleSelector(node Node, selector string) bool
 
 	selector = strings.TrimSpace(selector)
 
-	// Universal selector
 	if selector == "*" {
 		return true
 	}
 
-	// Parse compound selector (e.g., "div.class#id[attr]:hover")
 	parts := m.parseCompoundSelector(selector)
-
 	for _, part := range parts {
 		if !m.matchesSelectorPart(node, part) {
 			return false
@@ -322,7 +448,7 @@ func (m *selectorMatcher) matchesSelectorPart(node Node, part string) bool {
 	}
 }
 
-// matchesAttributeSelector matches attribute selectors [attr], [attr=value], etc.
+// attribute selectors [attr], [attr=value], etc.
 func (m *selectorMatcher) matchesAttributeSelector(node Node, selector string) bool {
 	if !strings.HasPrefix(selector, "[") || !strings.HasSuffix(selector, "]") {
 		return false
@@ -350,7 +476,7 @@ func (m *selectorMatcher) matchesAttributeSelector(node Node, selector string) b
 	return m.matchesAttributeOperator(attrValue, operator, value)
 }
 
-// parseAttributeSelector extracts attribute name, operator, and value from selector content
+// extracts attribute name, operator, and value from selector content
 func (m *selectorMatcher) parseAttributeSelector(content string) (string, string, string) {
 	operators := []string{"*=", "^=", "$=", "~=", "|=", "="}
 
@@ -504,34 +630,34 @@ func (m *selectorMatcher) isOnlyOfType(node Node) bool {
 }
 
 func (m *selectorMatcher) matchesComplexSelector(node Node, selector string) bool {
-	// Handle descendant combinator (space)
 	parts := strings.Fields(selector)
 	if len(parts) < 2 {
+		return m.matchesSimpleSelector(node, selector)
+	}
+
+	targetSelector := parts[len(parts)-1]
+	if !m.matchesSimpleSelector(node, targetSelector) {
 		return false
 	}
 
-	if !m.matchesSimpleSelector(node, parts[len(parts)-1]) {
-		return false
-	}
+	return m.hasMatchingAncestor(node, parts[:len(parts)-1])
+}
 
-	// Check if any ancestor matches the remaining selectors
+func (m *selectorMatcher) hasMatchingAncestor(node Node, ancestorSelectors []string) bool {
 	current := node.GetParent()
-	for i := len(parts) - 2; i >= 0 && current != nil; i-- {
-		found := false
-		for current != nil {
-			if m.matchesSimpleSelector(current, parts[i]) {
-				found = true
-				current = current.GetParent()
-				break
+	selectorIndex := len(ancestorSelectors) - 1
+
+	for current != nil && selectorIndex >= 0 {
+		if m.matchesSimpleSelector(current, ancestorSelectors[selectorIndex]) {
+			selectorIndex--
+			if selectorIndex < 0 {
+				return true
 			}
-			current = current.GetParent()
 		}
-		if !found {
-			return false
-		}
+		current = current.GetParent()
 	}
 
-	return true
+	return selectorIndex < 0
 }
 
 func (m *selectorMatcher) matchesChildSelector(node Node, selector string) bool {
@@ -540,8 +666,8 @@ func (m *selectorMatcher) matchesChildSelector(node Node, selector string) bool 
 		return false
 	}
 
-	parentSelector := strings.TrimSpace(parts[0])
 	childSelector := strings.TrimSpace(parts[1])
+	parentSelector := strings.TrimSpace(parts[0])
 
 	if !m.matchesSimpleSelector(node, childSelector) {
 		return false
@@ -557,30 +683,40 @@ func (m *selectorMatcher) matchesAdjacentSiblingSelector(node Node, selector str
 		return false
 	}
 
-	firstSelector := strings.TrimSpace(parts[0])
-	secondSelector := strings.TrimSpace(parts[1])
+	targetSelector := strings.TrimSpace(parts[1])
+	siblingSelector := strings.TrimSpace(parts[0])
 
-	if !m.matchesSimpleSelector(node, secondSelector) {
+	if !m.matchesSimpleSelector(node, targetSelector) {
 		return false
 	}
 
+	return m.hasPreviousSiblingMatching(node, siblingSelector)
+}
+
+func (m *selectorMatcher) hasPreviousSiblingMatching(node Node, selector string) bool {
 	parent := node.GetParent()
 	if parent == nil {
 		return false
 	}
 
-	children := parent.GetChildren()
-	for i, child := range children {
-		if child == node && i > 0 {
-			for j := i - 1; j >= 0; j-- {
-				if children[j].GetType() == ElementNodeType {
-					return m.matchesSimpleSelector(children[j], firstSelector)
-				}
-			}
-		}
+	siblings := parent.GetChildren()
+	nodeIndex := m.findNodeIndexInSiblings(siblings, node)
+
+	if nodeIndex <= 0 {
+		return false
 	}
 
-	return false
+	previousSibling := siblings[nodeIndex-1]
+	return m.matchesSimpleSelector(previousSibling, selector)
+}
+
+func (m *selectorMatcher) findNodeIndexInSiblings(siblings []Node, target Node) int {
+	for i, sibling := range siblings {
+		if sibling == target {
+			return i
+		}
+	}
+	return -1
 }
 
 func (m *selectorMatcher) matchesGeneralSiblingSelector(node Node, selector string) bool {
@@ -588,28 +724,29 @@ func (m *selectorMatcher) matchesGeneralSiblingSelector(node Node, selector stri
 	if len(parts) != 2 {
 		return false
 	}
-	firstSelector := strings.TrimSpace(parts[0])
-	secondSelector := strings.TrimSpace(parts[1])
 
-	if !m.matchesSimpleSelector(node, secondSelector) {
+	targetSelector := strings.TrimSpace(parts[1])
+	siblingSelector := strings.TrimSpace(parts[0])
+
+	if !m.matchesSimpleSelector(node, targetSelector) {
 		return false
 	}
+
+	return m.hasAnyPreviousSiblingMatching(node, siblingSelector)
+}
+
+func (m *selectorMatcher) hasAnyPreviousSiblingMatching(node Node, selector string) bool {
 	parent := node.GetParent()
 	if parent == nil {
 		return false
 	}
 
-	children := parent.GetChildren()
-	for i, child := range children {
-		if child == node {
-			for j := i - 1; j >= 0; j-- {
-				if children[j].GetType() == ElementNodeType {
-					if m.matchesSimpleSelector(children[j], firstSelector) {
-						return true
-					}
-				}
-			}
-			break
+	siblings := parent.GetChildren()
+	nodeIndex := m.findNodeIndexInSiblings(siblings, node)
+
+	for i := 0; i < nodeIndex; i++ {
+		if m.matchesSimpleSelector(siblings[i], selector) {
+			return true
 		}
 	}
 

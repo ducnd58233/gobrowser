@@ -13,17 +13,17 @@ const (
 	WindowMinHeight     = 600
 )
 
-// UI component heights (in pixels) - optimized for Qt
 const (
-	TabBarHeight   = 50 // Tab bar height
-	ToolbarHeight  = 45 // Toolbar height
-	URLInputHeight = 32 // URL input field height
-	ButtonHeight   = 32 // Standard button height
+	TabBarHeight   = 50
+	ToolbarHeight  = 40
+	URLInputHeight = 32
+	ButtonHeight   = 32
+	TabHeight      = 32
+	ScrollbarWidth = 16
 )
 
-// Tab styling constants - Chrome-like appearance
 const (
-	TabPadding      = 8
+	TabPadding      = 12
 	TabSpacing      = 2
 	TabMinWidth     = 180
 	TabMaxWidth     = 280
@@ -55,9 +55,7 @@ const (
 	ButtonPadding  = 8
 )
 
-// Color constants (CSS-style colors for Qt)
 const (
-	// Active tab: Chrome blue
 	TabColorActive   = "#4285f4"
 	TabColorInactive = "#f5f5f5"
 	TabColorHover    = "#ebebeb"
@@ -85,6 +83,12 @@ const (
 	// Go button
 	GoButtonBGColor   = "#4285f4"
 	GoButtonTextColor = "#ffffff"
+
+	PrimaryBlue     = "#3498db"
+	SecondaryGray   = "#95a5a6"
+	BackgroundLight = "#f8f9fa"
+	TextDark        = "#2c3e50"
+	BorderLight     = "#e1e8ed"
 )
 
 // Text constants
@@ -93,4 +97,14 @@ const (
 	LoadingText    = "Loading..."
 	ErrorText      = "Error loading page"
 	EmptyText      = "No content to display"
+)
+
+const (
+	DefaultFontSize = 12
+	HeadingFontSize = 14
+)
+
+// Border radius
+const (
+	BorderRadius = 4
 )

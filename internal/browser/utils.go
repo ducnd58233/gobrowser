@@ -1,11 +1,16 @@
 package browser
 
 import (
+	"compress/gzip"
+	"context"
 	"crypto/rand"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -237,7 +242,7 @@ type TextProcessor interface {
 	TrimAndNormalize(text string) string
 }
 
-type textProcessor struct {}
+type textProcessor struct{}
 
 func NewTextProcessor() TextProcessor {
 	return &textProcessor{}
@@ -259,3 +264,155 @@ func (tp *textProcessor) TrimAndNormalize(text string) string {
 	return strings.Join(normalized, " ")
 }
 
+type APIHandler interface {
+	FetchContent(ctx context.Context, url string) (string, error)
+}
+
+type apiHandler struct {
+	client         *http.Client
+	urlNormalizer  URLNormalizer
+	activeRequests map[string]context.CancelFunc
+	requestMutex   sync.Mutex
+	fetchPool      chan struct{}
+}
+
+func NewAPIHandler() APIHandler {
+	transport := &http.Transport{
+		MaxIdleConns:        MaxConcurrentConnections,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     DefaultTimeout,
+		DisableCompression:  false,
+		ForceAttemptHTTP2:   true,
+	}
+
+	client := &http.Client{
+		Timeout:   DefaultTimeout,
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
+	}
+
+	return &apiHandler{
+		client:         client,
+		urlNormalizer:  NewURLNormalizer(),
+		fetchPool:      make(chan struct{}, MaxConcurrentConnections),
+		activeRequests: make(map[string]context.CancelFunc),
+	}
+}
+
+func (ah *apiHandler) FetchContent(ctx context.Context, url string) (string, error) {
+	normalizedURL, err := ah.urlNormalizer.Normalize(url)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", ErrInvalidURL, err)
+	}
+	if err := ah.acquireFetchSlot(ctx); err != nil {
+		return "", err
+	}
+	defer ah.releaseFetchSlot()
+
+	cancelCtx := ah.registerRequest(ctx, normalizedURL)
+	defer ah.unregisterRequest(url)
+
+	content, err := ah.performHTTPRequest(cancelCtx, normalizedURL)
+	if err != nil {
+		return "", err
+	}
+
+	return content, nil
+}
+
+func (ah *apiHandler) performHTTPRequest(ctx context.Context, urlStr string) (string, error) {
+	req, err := ah.createHTTPRequest(ctx, urlStr)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := ah.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	return ah.readResponseContent(resp)
+}
+
+func (ah *apiHandler) createHTTPRequest(ctx context.Context, urlStr string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, NewBrowserError(ErrInvalidURL, "failed to create request: "+err.Error())
+	}
+
+	ah.setRequestHeaders(req)
+	return req, nil
+}
+
+func (ah *apiHandler) readResponseContent(resp *http.Response) (string, error) {
+	reader := ah.createResponseReader(resp)
+	defer ah.closeReader(reader, resp)
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
+}
+
+func (ah *apiHandler) createResponseReader(resp *http.Response) io.Reader {
+	if !strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
+		return resp.Body
+	}
+
+	gzReader, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return resp.Body
+	}
+	return gzReader
+}
+
+func (ah *apiHandler) closeReader(reader io.Reader, resp *http.Response) {
+	if gzReader, ok := reader.(*gzip.Reader); ok && gzReader != resp.Body {
+		gzReader.Close()
+	}
+}
+
+func (ah *apiHandler) setRequestHeaders(req *http.Request) {
+	req.Header.Set("User-Agent", DefaultUserAgent)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Accept-Encoding", "gzip, deflate")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+}
+
+func (ah *apiHandler) acquireFetchSlot(ctx context.Context) error {
+	select {
+	case ah.fetchPool <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return NewBrowserError(ErrNetworkTimeout, "request cancelled")
+	}
+}
+
+func (ah *apiHandler) releaseFetchSlot() {
+	<-ah.fetchPool
+}
+
+func (ah *apiHandler) registerRequest(ctx context.Context, urlStr string) context.Context {
+	ah.requestMutex.Lock()
+	defer ah.requestMutex.Unlock()
+
+	cancelCtx, cancel := context.WithCancel(ctx)
+	ah.activeRequests[urlStr] = cancel
+	return cancelCtx
+}
+
+func (ah *apiHandler) unregisterRequest(urlStr string) {
+	ah.requestMutex.Lock()
+	defer ah.requestMutex.Unlock()
+	delete(ah.activeRequests, urlStr)
+}

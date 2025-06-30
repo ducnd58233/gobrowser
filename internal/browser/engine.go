@@ -2,10 +2,6 @@ package browser
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
 	"sync"
 )
 
@@ -13,40 +9,33 @@ type Engine interface {
 	GetTabCount() int
 	GetTab(idx int) Tab
 	AddTab() Tab
-	CloseTab(idx int)
-	RefreshTab(idx int)
+	CloseTab(idx int) error
+	RefreshTab(idx int) error
 	FetchContent(ctx context.Context, tabIdx int, rawURL string) error
 	SetDebugMode(enabled bool)
+	GetDebugMode() bool
 }
 
 type engine struct {
-	client *http.Client
-	tabs   []Tab
-	mutex  sync.RWMutex
+	tabs  []Tab
+	mutex sync.RWMutex
 
-	urlNormalizer   URLNormalizer
+	apiHandler      APIHandler
 	documentBuilder DocumentBuilder
-	debugMode       bool
+
+	debugMode      bool
+	isShuttingDown bool
 }
 
 func NewEngine() Engine {
 	return &engine{
-		client: &http.Client{
-			Timeout: DefaultTimeout,
-			Transport: &http.Transport{
-				MaxIdleConns:        MaxConcurrentConnections,
-				MaxIdleConnsPerHost: 5,
-				IdleConnTimeout:     DefaultTimeout,
-				DisableCompression:  false,
-			},
-		},
 		tabs:            make([]Tab, 0),
-		urlNormalizer:   NewURLNormalizer(),
+		apiHandler:      NewAPIHandler(),
 		documentBuilder: NewDocumentBuilder(),
 		debugMode:       false,
+		isShuttingDown:  false,
 	}
 }
-
 func (e *engine) GetTabCount() int {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -74,84 +63,47 @@ func (e *engine) AddTab() Tab {
 	return tab
 }
 
-func (e *engine) CloseTab(idx int) {
+func (e *engine) CloseTab(idx int) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
 	if idx < 0 || idx >= len(e.tabs) {
-		return
+		return NewBrowserError(ErrInvalidInput, "invalid tab index")
 	}
 
 	e.tabs = append(e.tabs[:idx], e.tabs[idx+1:]...)
+	return nil
 }
 
-func (e *engine) RefreshTab(idx int) {
+func (e *engine) RefreshTab(idx int) error {
 	tab := e.GetTab(idx)
 	if tab == nil {
-		return
+		return NewBrowserError(ErrInvalidInput, "invalid tab index")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-	_ = e.FetchContent(ctx, idx, tab.GetURL())
+
+	return e.FetchContent(context.Background(), idx, tab.GetURL())
 }
 
 func (e *engine) FetchContent(ctx context.Context, tabIdx int, rawURL string) error {
 	tab := e.GetTab(tabIdx)
 	if tab == nil {
-		return errors.New("tab cannot be nil")
+		return NewBrowserError(ErrInvalidInput, "invalid tab index")
 	}
 
-	normalizedURL, err := e.urlNormalizer.Normalize(rawURL)
+	content, err := e.apiHandler.FetchContent(ctx, rawURL)
 	if err != nil {
-		return fmt.Errorf("failed to parse URL: %w", err)
+		return NewBrowserError(ErrNetworkTimeout, err.Error())
 	}
-
-	content, err := e.fetchHTTPContent(ctx, normalizedURL)
-	if err != nil {
-		return err
-	}
-
-	tab.SetURL(normalizedURL)
 
 	doc, err := e.documentBuilder.Build(content)
 	if err != nil {
-		return err
+		return NewBrowserError(ErrParsingFailed, "failed to build document: "+err.Error())
 	}
 
+	tab.SetURL(rawURL)
 	tab.SetDocument(doc)
 
 	return nil
-}
-
-func (e *engine) fetchHTTPContent(ctx context.Context, urlStr string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Set("User-Agent", DefaultUserAgent)
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-
-	resp, err := e.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", ErrNetworkTimeout, err)
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			_ = closeErr
-		}
-	}()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		return "", fmt.Errorf("%s: HTTP %d", ErrHTTPError, resp.StatusCode)
-	}
-
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(content), nil
 }
 
 func (e *engine) SetDebugMode(enabled bool) {
@@ -159,4 +111,10 @@ func (e *engine) SetDebugMode(enabled bool) {
 	defer e.mutex.Unlock()
 	e.debugMode = enabled
 	e.documentBuilder.SetDebugMode(enabled)
+}
+
+func (e *engine) GetDebugMode() bool {
+	e.mutex.RLock()
+	defer e.mutex.RUnlock()
+	return e.debugMode
 }

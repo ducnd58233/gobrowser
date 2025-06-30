@@ -313,10 +313,6 @@ func (t *tokenizer) parseText() (*Token, error) {
 	}
 
 	text := t.content[start:t.pos]
-	if strings.TrimSpace(text) == "" && len(text) > 0 {
-		return &Token{Type: TokenTypeText, Text: " "}, nil
-	}
-
 	return &Token{Type: TokenTypeText, Text: text}, nil
 }
 

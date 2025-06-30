@@ -1,7 +1,7 @@
 package browser
 
 import (
-	"slices"
+	"html"
 	"strings"
 )
 
@@ -58,215 +58,162 @@ type HTMLParser interface {
 	GetMetadata() map[string]string
 	GetStyleTags() string
 	GetScripts() []ScriptInfo
+	GetStylesheetLinks() []string
 	PrintTree() string
 }
 
 type htmlParser struct {
-	root        Node
-	tokenizer   Tokenizer
-	specialTags HTMLSpecialTags
-	styleTags   strings.Builder
-	metadata    map[string]string
-	scripts     []ScriptInfo
+	root           Node
+	tokenizer      Tokenizer
+	specialTags    HTMLSpecialTags
+	styleTags      strings.Builder
+	metadata       map[string]string
+	scripts        []ScriptInfo
+	stylesheetURLs []string
+	stack          []Node
 }
 
 func NewHTMLParser(html string) HTMLParser {
 	return &htmlParser{
-		tokenizer:   NewTokenizer(html),
-		specialTags: NewHTMLSpecialTags(),
-		metadata:    make(map[string]string),
-		scripts:     make([]ScriptInfo, 0),
+		tokenizer:      NewTokenizer(html),
+		specialTags:    NewHTMLSpecialTags(),
+		metadata:       make(map[string]string),
+		scripts:        make([]ScriptInfo, 0),
+		stylesheetURLs: make([]string, 0),
+		stack:          make([]Node, 0),
 	}
 }
 
-type parserState struct {
-	root          Node
-	head          Node
-	body          Node
-	currentParent Node
-	stack         []Node
-	inHead        bool
-}
-
 func (p *htmlParser) Parse() (Node, error) {
-	state := p.initializeParserState()
+	root := NewElementNode("html", make(map[string]string))
+	head := NewElementNode("head", make(map[string]string))
+	body := NewElementNode("body", make(map[string]string))
+	root.AddChild(head)
+	root.AddChild(body)
+	p.root = root
+	p.stack = []Node{root, body}
 
 	for p.tokenizer.HasMore() {
 		token, err := p.tokenizer.NextToken()
 		if err != nil {
 			continue
 		}
-
 		if token.Type == TokenTypeEOF {
 			break
 		}
-
-		p.processToken(token, state)
+		p.processToken(token)
 	}
-
-	return state.root, nil
+	return root, nil
 }
 
-func (p *htmlParser) initializeParserState() *parserState {
-	root := NewElementNode("html", make(map[string]string))
-	head := NewElementNode("head", make(map[string]string))
-	body := NewElementNode("body", make(map[string]string))
-
-	root.AddChild(head)
-	root.AddChild(body)
-	p.root = root
-
-	return &parserState{
-		root:          root,
-		head:          head,
-		body:          body,
-		currentParent: body,
-		stack:         []Node{root, body},
-		inHead:        false,
-	}
-}
-
-func (p *htmlParser) processToken(token *Token, state *parserState) {
+func (p *htmlParser) processToken(token *Token) {
 	switch token.Type {
 	case TokenTypeStartTag:
-		p.handleStartTag(token, state)
+		p.handleStartTag(token)
 	case TokenTypeSelfClosingTag:
-		p.handleSelfClosingTag(token, state)
+		p.handleSelfClosingTag(token)
 	case TokenTypeEndTag:
-		p.handleEndTag(token, state)
+		p.handleEndTag(token)
 	case TokenTypeText:
-		p.handleTextToken(token, state)
+		p.handleTextToken(token)
 	case TokenTypeComment:
-		p.handleCommentToken(token, state)
+		p.handleCommentToken(token)
 	}
 }
 
-func (p *htmlParser) handleStartTag(token *Token, state *parserState) {
+func (p *htmlParser) currentParent() Node {
+	if len(p.stack) == 0 {
+		return nil
+	}
+	return p.stack[len(p.stack)-1]
+}
+
+func (p *htmlParser) handleStartTag(token *Token) {
 	node := NewElementNode(token.Tag, token.Attributes)
-
-	if p.isSpecialStructuralTag(token.Tag) {
-		p.handleStructuralTag(token, node, state)
-		return
+	parent := p.currentParent()
+	if parent != nil {
+		parent.AddChild(node)
 	}
-
-	p.processSemanticTag(token.Tag, node, token.Attributes)
-
-	if state.inHead {
-		p.extractHeadData(token)
-	}
-
-	if p.shouldAddToDOM(token.Tag) {
-		p.addNodeToDOM(node, token.Tag, state)
-	}
-}
-
-func (p *htmlParser) isSpecialStructuralTag(tag string) bool {
-	return tag == "head" || tag == "body"
-}
-
-func (p *htmlParser) handleStructuralTag(token *Token, node Node, state *parserState) {
-	switch token.Tag {
-	case "head":
-		state.head = node
-		state.root.GetChildren()[0] = state.head
-		state.currentParent = state.head
-		state.stack = []Node{state.root, state.head}
-		state.inHead = true
-	case "body":
-		state.body = node
-		p.updateBodyInDOM(node, state)
-		state.currentParent = state.body
-		state.stack = []Node{state.root, state.body}
-		state.inHead = false
-	}
-}
-
-func (p *htmlParser) updateBodyInDOM(node Node, state *parserState) {
-	if len(state.root.GetChildren()) > 1 {
-		state.root.GetChildren()[1] = node
-	} else {
-		state.root.AddChild(node)
-	}
-}
-
-func (p *htmlParser) shouldAddToDOM(tag string) bool {
-	return !slices.Contains([]string{"script", "style"}, tag)
-}
-
-func (p *htmlParser) addNodeToDOM(node Node, tag string, state *parserState) {
-	if p.specialTags.IsSelfClosing(tag) {
-		state.currentParent.AddChild(node)
-	} else {
-		state.currentParent.AddChild(node)
-		state.stack = append(state.stack, node)
-		state.currentParent = node
-	}
-}
-
-func (p *htmlParser) handleSelfClosingTag(token *Token, state *parserState) {
-	node := NewElementNode(token.Tag, token.Attributes)
-	if state.inHead && token.Tag == "meta" {
-		p.extractMetadata(node)
-	}
-	state.currentParent.AddChild(node)
-}
-
-func (p *htmlParser) handleEndTag(token *Token, state *parserState) {
-	for i := len(state.stack) - 1; i >= 0; i-- {
-		if p.isMatchingElement(state.stack[i], token.Tag) {
-			state.stack = state.stack[:i+1]
-			p.updateCurrentParent(state)
-			p.handleSpecialEndTag(token.Tag, state)
-			break
-		}
-	}
-}
-
-func (p *htmlParser) isMatchingElement(node Node, tag string) bool {
-	return node.GetType() == ElementNodeType && node.GetTag() == tag
-}
-
-func (p *htmlParser) updateCurrentParent(state *parserState) {
-	if len(state.stack) > 1 {
-		state.currentParent = state.stack[len(state.stack)-2]
-	}
-}
-
-func (p *htmlParser) handleSpecialEndTag(tag string, state *parserState) {
-	if tag == "head" {
-		state.inHead = false
-		state.currentParent = state.body
-		state.stack = []Node{state.root, state.body}
-	}
-}
-
-func (p *htmlParser) handleTextToken(token *Token, state *parserState) {
-	if strings.TrimSpace(token.Text) != "" {
-		textNode := NewTextNode(token.Text)
-		state.currentParent.AddChild(textNode)
-	}
-}
-
-func (p *htmlParser) handleCommentToken(token *Token, state *parserState) {
-	commentNode := NewCommentNode(token.Text)
-	state.currentParent.AddChild(commentNode)
-}
-
-func (p *htmlParser) extractHeadData(token *Token) {
-	switch token.Tag {
-	case "style":
+	p.stack = append(p.stack, node)
+	if token.Tag == "style" {
 		content := p.extractTagContent("style")
 		p.styleTags.WriteString(content)
 		p.styleTags.WriteString("\n")
-	case "script":
+	}
+	if token.Tag == "link" {
+		p.processLinkTag(token)
+	}
+	if token.Tag == "script" {
 		p.extractScriptFromToken(token)
-	case "title":
+	}
+	if token.Tag == "title" {
 		content := p.extractTagContent("title")
 		p.metadata["title"] = content
-	case "meta":
-		node := NewElementNode(token.Tag, token.Attributes)
+	}
+	if token.Tag == "meta" {
 		p.extractMetadata(node)
 	}
+}
+
+func (p *htmlParser) handleEndTag(token *Token) {
+	for len(p.stack) > 1 {
+		top := p.stack[len(p.stack)-1]
+		if top.GetTag() == token.Tag {
+			p.stack = p.stack[:len(p.stack)-1]
+			return
+		}
+		p.stack = p.stack[:len(p.stack)-1]
+	}
+}
+
+func (p *htmlParser) handleSelfClosingTag(token *Token) {
+	node := NewElementNode(token.Tag, token.Attributes)
+	parent := p.currentParent()
+	if parent != nil {
+		parent.AddChild(node)
+	}
+	if token.Tag == "meta" {
+		p.extractMetadata(node)
+	}
+}
+
+func (p *htmlParser) handleTextToken(token *Token) {
+	if token.Text == "" {
+		return
+	}
+	parent := p.currentParent()
+	if parent == nil {
+		return
+	}
+	decodedText := html.UnescapeString(token.Text)
+	if p.isInPre() {
+		decodedText = p.preservePreformattedText(decodedText)
+	}
+	textNode := NewTextNode(decodedText)
+	parent.AddChild(textNode)
+}
+
+func (p *htmlParser) isInPre() bool {
+	for i := len(p.stack) - 1; i >= 0; i-- {
+		n := p.stack[i]
+		if n.GetTag() == "pre" {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *htmlParser) preservePreformattedText(text string) string {
+	return strings.ReplaceAll(text, "\t", "    ")
+}
+
+func (p *htmlParser) handleCommentToken(token *Token) {
+	parent := p.currentParent()
+	if parent == nil {
+		return
+	}
+	commentNode := NewCommentNode(token.Text)
+	parent.AddChild(commentNode)
 }
 
 func (p *htmlParser) extractMetadata(node Node) {
@@ -351,6 +298,10 @@ func (p *htmlParser) GetScripts() []ScriptInfo {
 	return p.scripts
 }
 
+func (p *htmlParser) GetStylesheetLinks() []string {
+	return p.stylesheetURLs
+}
+
 func (p *htmlParser) PrintTree() string {
 	if p.root == nil {
 		return "No DOM tree available\n"
@@ -373,30 +324,12 @@ func (p *htmlParser) printNodeRecursive(node Node, depth int) string {
 	return result
 }
 
-func (p *htmlParser) processSemanticTag(tag string, node Node, attributes map[string]string) {
-	switch tag {
-	case "a":
-		if href, exists := attributes["href"]; exists {
-			node.SetAttribute("href", href)
-			node.SetAttribute("role", "link")
-		}
-	case "nav":
-		node.SetAttribute("role", "navigation")
-	case "button":
-		node.SetAttribute("role", "button")
-		if buttonType, exists := attributes["type"]; !exists {
-			node.SetAttribute("type", "button")
-		} else {
-			node.SetAttribute("type", buttonType)
-		}
-	case "pre", "code":
-		node.SetAttribute("whitespace", "pre")
-		if lang, exists := attributes["class"]; exists && strings.HasPrefix(lang, "language-") {
-			node.SetAttribute("syntax-highlight", strings.TrimPrefix(lang, "language-"))
-		}
-	case "ul", "ol":
-		node.SetAttribute("role", "list")
-	case "li":
-		node.SetAttribute("role", "listitem")
+func (p *htmlParser) processLinkTag(token *Token) {
+	attrs := token.Attributes
+	rel, hasRel := attrs["rel"]
+	href, hasHref := attrs["href"]
+
+	if hasRel && hasHref && rel == "stylesheet" {
+		p.stylesheetURLs = append(p.stylesheetURLs, href)
 	}
 }
