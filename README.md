@@ -6,7 +6,7 @@
 [![Gio](https://img.shields.io/badge/GioUI-v0.8.0-007ACC?style=for-the-badge&logo=go&logoColor=white)](https://gioui.org/)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen?style=for-the-badge)](Makefile)
 
-**A modern web browser built from scratch in Go using Fyne**
+**A modern web browser built from scratch in Go using GioUI**
 
 _Learning browser internals by implementing core web technologies_
 
@@ -41,7 +41,7 @@ GoBrowser is an educational web browser implementation built from the ground up 
 
 ### 🚧 In Development
 
-- [] **Browser Layout**
+- [ ] **Browser Layout**
 
   - [x] Multi-tab interface with `DocTabs`
   - [x] Navigation toolbar (back, forward, refresh, address bar)
@@ -114,7 +114,7 @@ gobrowser/
 │   │   ├── tab.go             # Tab management
 │   │   ├── const.go           # Constants
 │   │   └── utils.go           # Utility functions
-│   └── 📁 ui/                 # Fyne UI components
+│   └── 📁 ui/                 # Gio UI components
 │       ├── main_window.go     # Main window
 │       ├── toolbar.go         # Navigation toolbar
 │       ├── tabview.go         # Tab interface
