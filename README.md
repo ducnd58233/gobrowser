@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Go](https://img.shields.io/badge/Go-1.23.6+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org/)
-[![Gio](https://img.shields.io/badge/Fyne-v2.6.1-007ACC?style=for-the-badge&logo=go&logoColor=white)](https://gioui.org/)
+[![Gio](https://img.shields.io/badge/GioUI-v0.8.0-007ACC?style=for-the-badge&logo=go&logoColor=white)](https://gioui.org/)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen?style=for-the-badge)](Makefile)
 
 **A modern web browser built from scratch in Go using Fyne**
