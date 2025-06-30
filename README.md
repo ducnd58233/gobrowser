@@ -43,20 +43,20 @@ GoBrowser is an educational web browser implementation built from the ground up 
 
 ### 🚧 In Development
 
-- [ ] **Browser Layout**
+- [] **Browser Layout**
 
-  - [ ] Multi-tab interface with `DocTabs`
-  - [ ] Navigation toolbar (back, forward, refresh, address bar)
+  - [x] Multi-tab interface with `DocTabs`
+  - [x] Navigation toolbar (back, forward, refresh, address bar)
   - [ ] Bookmark management system
   - [ ] Settings and preferences panel
 
 - [ ] **Core Browser Functionality**
-  - [ ] HTML parser and tokenizer
-  - [ ] CSS parser and styling engine
-  - [ ] DOM tree construction and manipulation
+  - [x] HTML parser and tokenizer
+  - [x] CSS parser and styling engine
+  - [x] DOM tree construction and manipulation
   - [ ] JavaScript execution environment
   - [ ] Task scheduling and threading
-  - [ ] Network request handling
+  - [x] Network request handling
 
 ### 🎯 Planned Features
 
@@ -86,8 +86,12 @@ go mod download
 # Install development tools
 make install-tools
 
-# Build and run the application
+
+# run the application w/o debug mode
 make run-app
+
+# run the application with debug mode
+make run-app-debug
 ```
 
 ### Using Pre-built Binary
