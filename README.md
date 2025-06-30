@@ -173,11 +173,11 @@ Following the browser-engineering methodology, this project emphasizes:
 
 | Component   | Description                       | Status         |
 | ----------- | --------------------------------- | -------------- |
-| HTML Parser | Tokenization and DOM construction | 🚧 Planning    |
-| CSS Engine  | Styling and layout computation    | 🚧 Planning    |
+| HTML Parser | Tokenization and DOM construction | ✅ In Progress
+| CSS Engine  | Styling and layout computation    | ✅ In Progress  |
 | JavaScript  | V8-like execution environment     | 🚧 Planning    |
-| Networking  | HTTP/HTTPS request handling       | 🚧 Planning    |
-| UI Layer    | Fyne-based user interface         | ✅ In Progress |
+| Networking  | HTTP/HTTPS request handling       | ✅ In Progress  |
+| UI Layer    | GioUI-based user interface         | ✅ In Progress |
 
 ## 🤝 Contributing
 
