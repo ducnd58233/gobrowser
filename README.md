@@ -31,8 +31,6 @@ GoBrowser is an educational web browser implementation built from the ground up 
 - 🔄 **Multi-tab browsing experience**
 - 📱 **Cross-platform desktop support**
 
-> _"Every browser has thousands of unfixed bugs, from the smallest of mistakes to myriad mix ups and mismatches. Every browser must be endlessly tuned and optimized to squeeze out that last bit of performance."_ - Browser Engineering
-
 ## 🎯 Features
 
 ### ✅ Currently Implemented
