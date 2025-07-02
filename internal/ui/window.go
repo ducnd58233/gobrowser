@@ -13,6 +13,8 @@ import (
 	"gioui.org/widget/material"
 
 	"github.com/ducnd58233/gobrowser/internal/browser"
+	"github.com/ducnd58233/gobrowser/internal/ui/components"
+	blayout "github.com/ducnd58233/gobrowser/internal/ui/layout"
 )
 
 type MainWindow interface {
@@ -24,9 +26,9 @@ type mainWindow struct {
 	theme  *material.Theme
 	engine browser.Engine
 
-	tabView         TabView
-	toolbar         Toolbar
-	contentRenderer ContentRenderer
+	tabView         components.TabView
+	toolbar         components.Toolbar
+	contentRenderer components.Content
 }
 
 func NewMainWindow(isDebugMode bool) MainWindow {
@@ -38,14 +40,14 @@ func NewMainWindow(isDebugMode bool) MainWindow {
 
 	theme := createTheme()
 
-	layoutEngineDeps := LayoutEngineDependencies{
+	layoutEngineDeps := blayout.LayoutEngineDependencies{
 		ColorParser: browser.NewColorParser(),
 		UnitParser:  browser.NewUnitParser(),
-		Cache:       NewLayoutCache(),
+		Cache:       blayout.NewLayoutCache(),
 	}
-	contentRendererDeps := ContentRendererDependencies{
+	contentRendererDeps := components.ContentDependencies{
 		Engine:       engine,
-		LayoutEngine: NewLayoutEngine(layoutEngineDeps),
+		LayoutEngine: blayout.NewLayoutEngine(layoutEngineDeps),
 		DebugMode:    isDebugMode,
 	}
 
@@ -53,23 +55,23 @@ func NewMainWindow(isDebugMode bool) MainWindow {
 		window:          window,
 		theme:           theme,
 		engine:          engine,
-		tabView:         NewTabView(engine),
-		toolbar:         NewToolbar(engine),
-		contentRenderer: NewContentRenderer(contentRendererDeps),
+		tabView:         components.NewTabView(engine),
+		toolbar:         components.NewToolbar(engine),
+		contentRenderer: components.NewContentRenderer(contentRendererDeps),
 	}
 }
 
 func createAppWindow() *app.Window {
 	window := &app.Window{}
 	window.Option(
-		app.Title(AppName),
+		app.Title(components.AppName),
 		app.Size(
-			unit.Dp(WindowDefaultWidth),
-			unit.Dp(WindowDefaultHeight),
+			unit.Dp(components.WindowDefaultWidth),
+			unit.Dp(components.WindowDefaultHeight),
 		),
 		app.MinSize(
-			unit.Dp(WindowMinWidth),
-			unit.Dp(WindowMinHeight),
+			unit.Dp(components.WindowMinWidth),
+			unit.Dp(components.WindowMinHeight),
 		),
 	)
 	return window

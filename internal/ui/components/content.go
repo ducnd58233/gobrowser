@@ -1,4 +1,4 @@
-package ui
+package components
 
 import (
 	"image"
@@ -8,45 +8,31 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"github.com/ducnd58233/gobrowser/internal/browser"
+	blayout "github.com/ducnd58233/gobrowser/internal/ui/layout"
 )
 
-type ContentRenderer interface {
+type Content interface {
 	Render(gtx layout.Context, theme *material.Theme, tabIndex int) layout.Dimensions
 }
 
-type ContentRendererDependencies struct {
+type ContentDependencies struct {
 	Engine       browser.Engine
-	LayoutEngine LayoutEngine
+	LayoutEngine blayout.LayoutEngine
 	DebugMode    bool
 }
 
 type contentRenderer struct {
-	deps ContentRendererDependencies
+	deps ContentDependencies
 	list widget.List
 }
 
-func NewContentRenderer(deps ContentRendererDependencies) ContentRenderer {
+func NewContentRenderer(deps ContentDependencies) Content {
 	return &contentRenderer{
 		deps: deps,
 		list: widget.List{List: layout.List{Axis: layout.Vertical}},
 	}
 }
 
-func NewContentRendererWithDefaults(engine browser.Engine, debugMode bool) ContentRenderer {
-	layoutEngineDeps := LayoutEngineDependencies{
-		ColorParser: browser.NewColorParser(),
-		UnitParser:  browser.NewUnitParser(),
-		Cache:       NewLayoutCache(),
-	}
-
-	deps := ContentRendererDependencies{
-		Engine:       engine,
-		LayoutEngine: NewLayoutEngine(layoutEngineDeps),
-		DebugMode:    debugMode,
-	}
-
-	return NewContentRenderer(deps)
-}
 
 func (cr *contentRenderer) Render(gtx layout.Context, theme *material.Theme, tabIndex int) layout.Dimensions {
 	tab := cr.deps.Engine.GetTab(tabIndex)
