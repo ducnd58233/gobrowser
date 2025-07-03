@@ -4,6 +4,8 @@ import (
 	"context"
 	"image"
 	"image/color"
+	"net/url"
+	"strings"
 
 	"gioui.org/layout"
 	"gioui.org/op/clip"
@@ -253,8 +255,10 @@ func (t *toolbar) handleNavigate(currTabIdx int) {
 		currTabIdx = t.engine.GetTabCount() - 1
 	}
 
+	navigationURL := t.resolveNavigationURL(url, tab.GetURL())
+
 	t.SetProgress(0.1)
-	tab.Navigate(url)
+	tab.Navigate(navigationURL)
 
 	// Update tracking state
 	t.lastTabIndex = currTabIdx
@@ -265,10 +269,32 @@ func (t *toolbar) handleNavigate(currTabIdx int) {
 		defer cancel()
 
 		t.SetProgress(0.3)
-		if err := t.engine.Navigate(ctx, currTabIdx, url); err == nil {
+		if err := t.engine.Navigate(ctx, currTabIdx, navigationURL); err == nil {
 			t.SetProgress(1.0)
 		} else {
 			t.SetProgress(0.0)
 		}
 	}()
+}
+
+func (t *toolbar) resolveNavigationURL(input, currentURL string) string {
+	input = strings.TrimSpace(input)
+
+	if strings.Contains(input, "://") {
+		return input
+	}
+
+	if _, err := url.Parse("https://" + input); err == nil {
+		if !strings.Contains(input, "/") && !strings.Contains(input, " ") {
+			return "https://" + input
+		}
+	}
+
+	if strings.HasPrefix(input, "/") && currentURL != "" {
+		if resolvedURL, err := t.engine.GetURLHandler().Resolve(currentURL, input); err == nil {
+			return resolvedURL
+		}
+	}
+
+	return "https://www.google.com/search?q=" + url.QueryEscape(input)
 }

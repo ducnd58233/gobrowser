@@ -12,6 +12,7 @@ type Engine interface {
 	CloseTab(idx int) error
 	RefreshTab(idx int) error
 	Navigate(ctx context.Context, tabIdx int, url string) error
+	GetURLHandler() URLHandler
 	SetDebugMode(enabled bool)
 	GetDebugMode() bool
 }
@@ -123,6 +124,10 @@ func (e *engine) fetchContentForTab(ctx context.Context, tabIdx int, normalizedU
 	tab.SetDocument(doc)
 
 	return nil
+}
+
+func (e *engine) GetURLHandler() URLHandler {
+	return e.urlHandler
 }
 
 func (e *engine) SetDebugMode(enabled bool) {

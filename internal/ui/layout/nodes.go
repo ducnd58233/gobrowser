@@ -511,6 +511,11 @@ func (pl *preformattedLayout) Layout(width float64) float64 {
 		currentY += childHeight
 	}
 
+	lines := strings.Split(pl.node.GetText(), "\n")
+	if len(lines) > 0 {
+		currentY += float64(len(lines)) * pl.deps.Cache.GetFontSize(pl.style.GetProperty(browser.PropFontSize).Raw, pl.deps.UnitParser, browser.DefaultFontSize) * browser.LineHeightRatio
+	}
+
 	pl.bounds.Height = (currentY - pl.bounds.Y) + pl.padding.bottom + pl.margin.bottom - (contentY - pl.bounds.Y)
 	return pl.bounds.Height
 }
@@ -635,10 +640,9 @@ func (pil *preformattedInlineLayout) Paint(displayList render.DisplayList) {
 	currentY := pil.bounds.Y
 
 	for _, line := range lines {
-		if line != "" {
-			drawCmd := render.NewDrawText(pil.bounds.X, currentY, line, pil.metrics.FontSize, textColor, pil.node)
-			displayList.AddCommand(drawCmd)
-		}
+		trimmed := strings.TrimRight(line, "\n")
+		drawCmd := render.NewDrawText(pil.bounds.X, currentY, trimmed, pil.metrics.FontSize, textColor, pil.node)
+		displayList.AddCommand(drawCmd)
 		currentY += pil.metrics.LineHeight
 	}
 }
