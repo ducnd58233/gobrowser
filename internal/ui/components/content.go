@@ -33,7 +33,6 @@ func NewContentRenderer(deps ContentDependencies) Content {
 	}
 }
 
-
 func (cr *contentRenderer) Render(gtx layout.Context, theme *material.Theme, tabIndex int) layout.Dimensions {
 	tab := cr.deps.Engine.GetTab(tabIndex)
 	if tab == nil {

@@ -32,43 +32,136 @@ func (g *idGenerator) Generate() string {
 	return fmt.Sprintf("%x", bytes)
 }
 
-type URLNormalizer interface {
+type URLHandler interface {
 	Normalize(rawURL string) (string, error)
+	Resolve(baseURL, relativeURL string) (string, error)
 	IsValidScheme(scheme string) bool
+	IsAbsoluteURL(url string) bool
+	GetDomain(url string) (string, error)
 }
 
-type urlNormalizer struct {
+type urlHandler struct {
 	supportedSchemes map[string]bool
 }
 
-func NewURLNormalizer() URLNormalizer {
-	return &urlNormalizer{
+func NewURLHandler() URLHandler {
+	return &urlHandler{
 		supportedSchemes: map[string]bool{
 			"http":  true,
 			"https": true,
+			"file":  true,
+			"data":  true,
 		},
 	}
 }
 
-func (n *urlNormalizer) Normalize(rawURL string) (string, error) {
+func (h *urlHandler) Normalize(rawURL string) (string, error) {
 	if rawURL == "" {
 		return "", ErrInvalidURL
 	}
 
-	if !strings.Contains(rawURL, "://") {
-		rawURL = "https://" + rawURL
+	rawURL = strings.TrimSpace(rawURL)
+
+	if strings.HasPrefix(rawURL, "data:") || strings.HasPrefix(rawURL, "file:") {
+		return rawURL, nil
 	}
 
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", ErrInvalidURL, err)
+	if strings.Contains(rawURL, "://") {
+		parsed, err := url.Parse(rawURL)
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", ErrInvalidURL, err)
+		}
+
+		// Validate scheme
+		if !h.IsValidScheme(parsed.Scheme) {
+			return "", fmt.Errorf("%s: unsupported scheme '%s'", ErrInvalidURL, parsed.Scheme)
+		}
+
+		if parsed.Host == "" {
+			return "", fmt.Errorf("%s: missing host", ErrInvalidURL)
+		}
+
+		normalized := parsed.String()
+
+		// Remove trailing slash for consistency (except for root paths)
+		if strings.HasSuffix(normalized, "/") && parsed.Path == "/" {
+			normalized = normalized[:len(normalized)-1]
+		}
+
+		return normalized, nil
 	}
 
-	return parsed.String(), nil
+	return "", fmt.Errorf("%s: relative URL '%s' requires base URL for resolution", ErrInvalidURL, rawURL)
 }
 
-func (n *urlNormalizer) IsValidScheme(scheme string) bool {
-	return n.supportedSchemes[scheme]
+func (h *urlHandler) Resolve(baseURL, relativeURL string) (string, error) {
+	if relativeURL == "" {
+		return "", ErrInvalidURL
+	}
+
+	if h.IsAbsoluteURL(relativeURL) {
+		return h.Normalize(relativeURL)
+	}
+
+	// Normalize base URL first
+	normalizedBase, err := h.Normalize(baseURL)
+	if err != nil {
+		return "", err
+	}
+
+	parsedBase, err := url.Parse(normalizedBase)
+	if err != nil {
+		return "", err
+	}
+
+	var resolvedURL string
+
+	if strings.HasPrefix(relativeURL, "//") {
+		// Protocol-relative URL
+		resolvedURL = parsedBase.Scheme + ":" + relativeURL
+	} else if strings.HasPrefix(relativeURL, "/") {
+		// Absolute path
+		resolvedURL = parsedBase.Scheme + "://" + parsedBase.Host + relativeURL
+	} else {
+		// Relative path
+		basePath := parsedBase.Path
+		if !strings.HasSuffix(basePath, "/") {
+			// Remove filename from base path
+			lastSlash := strings.LastIndex(basePath, "/")
+			if lastSlash != -1 {
+				basePath = basePath[:lastSlash+1]
+			} else {
+				basePath = "/"
+			}
+		}
+
+		for strings.HasPrefix(relativeURL, "../") {
+			relativeURL = relativeURL[3:]
+			if basePath != "/" {
+				basePath = basePath[:strings.LastIndex(basePath[:len(basePath)-1], "/")+1]
+			}
+		}
+
+		resolvedURL = parsedBase.Scheme + "://" + parsedBase.Host + basePath + relativeURL
+	}
+
+	return h.Normalize(resolvedURL)
+}
+
+func (h *urlHandler) IsValidScheme(scheme string) bool {
+	return h.supportedSchemes[scheme]
+}
+
+func (h *urlHandler) IsAbsoluteURL(rawURL string) bool {
+	return strings.Contains(rawURL, "://")
+}
+
+func (h *urlHandler) GetDomain(rawURL string) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	return parsed.Host, nil
 }
 
 type ColorParser interface {
@@ -265,12 +358,11 @@ func (tp *textProcessor) TrimAndNormalize(text string) string {
 }
 
 type APIHandler interface {
-	FetchContent(ctx context.Context, url string) (string, error)
+	FetchContent(ctx context.Context, normalizedURL string) (string, error)
 }
 
 type apiHandler struct {
 	client         *http.Client
-	urlNormalizer  URLNormalizer
 	activeRequests map[string]context.CancelFunc
 	requestMutex   sync.Mutex
 	fetchPool      chan struct{}
@@ -298,24 +390,19 @@ func NewAPIHandler() APIHandler {
 
 	return &apiHandler{
 		client:         client,
-		urlNormalizer:  NewURLNormalizer(),
 		fetchPool:      make(chan struct{}, MaxConcurrentConnections),
 		activeRequests: make(map[string]context.CancelFunc),
 	}
 }
 
-func (ah *apiHandler) FetchContent(ctx context.Context, url string) (string, error) {
-	normalizedURL, err := ah.urlNormalizer.Normalize(url)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", ErrInvalidURL, err)
-	}
+func (ah *apiHandler) FetchContent(ctx context.Context, normalizedURL string) (string, error) {
 	if err := ah.acquireFetchSlot(ctx); err != nil {
 		return "", err
 	}
 	defer ah.releaseFetchSlot()
 
 	cancelCtx := ah.registerRequest(ctx, normalizedURL)
-	defer ah.unregisterRequest(url)
+	defer ah.unregisterRequest(normalizedURL)
 
 	content, err := ah.performHTTPRequest(cancelCtx, normalizedURL)
 	if err != nil {
@@ -415,46 +502,4 @@ func (ah *apiHandler) unregisterRequest(urlStr string) {
 	ah.requestMutex.Lock()
 	defer ah.requestMutex.Unlock()
 	delete(ah.activeRequests, urlStr)
-}
-
-type URLResolver interface {
-	Resolve(baseURL, relativeURL string) (string, error)
-}
-
-type urlResolver struct{}
-
-func NewURLResolver() URLResolver {
-	return &urlResolver{}
-}
-
-func (r *urlResolver) Resolve(baseURL, relativeURL string) (string, error) {
-	if relativeURL == "" {
-		return "", ErrInvalidURL
-	}
-	if strings.Contains(relativeURL, "://") {
-		return relativeURL, nil
-	}
-	parsedBase, err := url.Parse(baseURL)
-	if err != nil {
-		return "", err
-	}
-	if strings.HasPrefix(relativeURL, "//") {
-		return parsedBase.Scheme + ":" + relativeURL, nil
-	}
-	if strings.HasPrefix(relativeURL, "/") {
-		return parsedBase.Scheme + "://" + parsedBase.Host + relativeURL, nil
-	}
-	// Handle .. in relative path
-	basePath := parsedBase.Path
-	if !strings.HasSuffix(basePath, "/") {
-		basePath = basePath[:strings.LastIndex(basePath, "/")+1]
-	}
-	for strings.HasPrefix(relativeURL, "../") {
-		relativeURL = relativeURL[3:]
-		if basePath != "/" {
-			basePath = basePath[:strings.LastIndex(basePath[:len(basePath)-1], "/")+1]
-		}
-	}
-	absPath := basePath + relativeURL
-	return parsedBase.Scheme + "://" + parsedBase.Host + absPath, nil
 }

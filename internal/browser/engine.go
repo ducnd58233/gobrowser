@@ -11,7 +11,7 @@ type Engine interface {
 	AddTab() Tab
 	CloseTab(idx int) error
 	RefreshTab(idx int) error
-	FetchContent(ctx context.Context, tabIdx int, rawURL string) error
+	Navigate(ctx context.Context, tabIdx int, url string) error
 	SetDebugMode(enabled bool)
 	GetDebugMode() bool
 }
@@ -22,6 +22,7 @@ type engine struct {
 
 	apiHandler      APIHandler
 	documentBuilder DocumentBuilder
+	urlHandler      URLHandler
 
 	debugMode      bool
 	isShuttingDown bool
@@ -32,6 +33,7 @@ func NewEngine() Engine {
 		tabs:            make([]Tab, 0),
 		apiHandler:      NewAPIHandler(),
 		documentBuilder: NewDocumentBuilder(),
+		urlHandler:      NewURLHandler(),
 		debugMode:       false,
 		isShuttingDown:  false,
 	}
@@ -81,26 +83,43 @@ func (e *engine) RefreshTab(idx int) error {
 		return NewBrowserError(ErrInvalidInput, "invalid tab index")
 	}
 
-	return e.FetchContent(context.Background(), idx, tab.GetURL())
+	return e.fetchContentForTab(context.Background(), idx, tab.GetURL())
 }
 
-func (e *engine) FetchContent(ctx context.Context, tabIdx int, rawURL string) error {
+func (e *engine) Navigate(ctx context.Context, tabIdx int, rawURL string) error {
 	tab := e.GetTab(tabIdx)
 	if tab == nil {
 		return NewBrowserError(ErrInvalidInput, "invalid tab index")
 	}
 
-	content, err := e.apiHandler.FetchContent(ctx, rawURL)
+	normalizedURL, err := e.urlHandler.Normalize(rawURL)
+	if err != nil {
+		return err
+	}
+
+	tab.Navigate(normalizedURL)
+	return e.fetchContentForTab(ctx, tabIdx, normalizedURL)
+}
+
+func (e *engine) fetchContentForTab(ctx context.Context, tabIdx int, normalizedURL string) error {
+	tab := e.GetTab(tabIdx)
+	if tab == nil {
+		return NewBrowserError(ErrInvalidInput, "invalid tab index")
+	}
+
+	content, err := e.apiHandler.FetchContent(ctx, normalizedURL)
 	if err != nil {
 		return NewBrowserError(ErrNetworkTimeout, err.Error())
 	}
+
+	e.documentBuilder.SetBaseURL(normalizedURL)
 
 	doc, err := e.documentBuilder.Build(content)
 	if err != nil {
 		return NewBrowserError(ErrParsingFailed, "failed to build document: "+err.Error())
 	}
 
-	tab.SetURL(rawURL)
+	tab.SetURL(normalizedURL)
 	tab.SetDocument(doc)
 
 	return nil

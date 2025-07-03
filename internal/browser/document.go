@@ -51,15 +51,17 @@ func (d *document) SetComputedStyle(node Node, style Style) {
 type DocumentBuilder interface {
 	Build(content string) (Document, error)
 	SetDebugMode(enabled bool)
+	SetBaseURL(baseURL string)
 }
 
 type documentBuilder struct {
 	apiHandler    APIHandler
-	urlResolver   URLResolver
+	urlHandler    URLHandler
 	htmlParser    HTMLParser
 	cssParser     CSSParser
 	cssApplicator CSSApplicator
 	debugMode     bool
+	baseURL       string
 }
 
 func NewDocumentBuilder() DocumentBuilder {
@@ -67,12 +69,17 @@ func NewDocumentBuilder() DocumentBuilder {
 		cssApplicator: NewCSSApplicator(),
 		debugMode:     false,
 		apiHandler:    NewAPIHandler(),
-		urlResolver:   NewURLResolver(),
+		urlHandler:    NewURLHandler(),
+		baseURL:       "",
 	}
 }
 
 func (db *documentBuilder) SetDebugMode(enabled bool) {
 	db.debugMode = enabled
+}
+
+func (db *documentBuilder) SetBaseURL(baseURL string) {
+	db.baseURL = baseURL
 }
 
 func (db *documentBuilder) Build(content string) (Document, error) {
@@ -161,8 +168,8 @@ func (db *documentBuilder) fetchExternalStylesheets(urls []string) string {
 	var combinedCSS strings.Builder
 	cssChannel := make(chan string, len(urls))
 
-	baseURL := ""
-	if db.htmlParser != nil {
+	baseURL := db.baseURL
+	if baseURL == "" && db.htmlParser != nil {
 		if metaURL, ok := db.htmlParser.GetMetadata()["url"]; ok {
 			baseURL = metaURL
 		}
@@ -171,7 +178,7 @@ func (db *documentBuilder) fetchExternalStylesheets(urls []string) string {
 	for _, link := range urls {
 		resolvedURL := link
 		if baseURL != "" {
-			if absURL, err := db.urlResolver.Resolve(baseURL, link); err == nil {
+			if absURL, err := db.urlHandler.Resolve(baseURL, link); err == nil {
 				resolvedURL = absURL
 			}
 		}
@@ -199,7 +206,16 @@ func (db *documentBuilder) fetchStylesheetAsync(url string, result chan<- string
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
-	content, err := db.apiHandler.FetchContent(ctx, url)
+	normalizedURL, err := db.urlHandler.Normalize(url)
+	if err != nil {
+		if db.debugMode {
+			log.Printf("Failed to normalize stylesheet URL %s: %v", url, err)
+		}
+		result <- ""
+		return
+	}
+
+	content, err := db.apiHandler.FetchContent(ctx, normalizedURL)
 	if err != nil {
 		if db.debugMode {
 			log.Printf("Failed to fetch stylesheet %s: %v", url, err)

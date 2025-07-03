@@ -250,6 +250,7 @@ func (t *toolbar) handleNavigate(currTabIdx int) {
 	tab := t.engine.GetTab(currTabIdx)
 	if tab == nil {
 		tab = t.engine.AddTab()
+		currTabIdx = t.engine.GetTabCount() - 1
 	}
 
 	t.SetProgress(0.1)
@@ -264,12 +265,10 @@ func (t *toolbar) handleNavigate(currTabIdx int) {
 		defer cancel()
 
 		t.SetProgress(0.3)
-		if err := t.engine.FetchContent(ctx, currTabIdx, url); err == nil {
+		if err := t.engine.Navigate(ctx, currTabIdx, url); err == nil {
 			t.SetProgress(1.0)
 		} else {
 			t.SetProgress(0.0)
 		}
-
-		t.engine.RefreshTab(currTabIdx)
 	}()
 }
